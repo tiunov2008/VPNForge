@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -13,6 +14,13 @@ from vpnforge.files import atomic_write
 
 DOMAIN_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+ENV_UNQUOTED_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def format_env_value(value: str) -> str:
+    if ENV_UNQUOTED_RE.fullmatch(value):
+        return value
+    return json.dumps(value, ensure_ascii=False)
 
 
 @dataclass(frozen=True)
@@ -99,6 +107,7 @@ class Settings:
     xray_reality_port: int = 443
     xray_tls_port: int = 8443
     fingerprint: str = "firefox"
+    subscription_title: str = "VPNForge"
 
     def as_env(self) -> str:
         return "\n".join(
@@ -110,6 +119,7 @@ class Settings:
                 f"XRAY_REALITY_PORT={self.xray_reality_port}",
                 f"XRAY_TLS_PORT={self.xray_tls_port}",
                 f"FINGERPRINT={self.fingerprint}",
+                f"SUBSCRIPTION_TITLE={format_env_value(self.subscription_title)}",
                 "",
             ]
         )
@@ -130,6 +140,17 @@ def create_settings(domain: str, email: str | None = None) -> Settings:
     return Settings(domain=domain, email=email)
 
 
+def validate_subscription_title(title: str) -> str:
+    title = title.strip()
+    if not title:
+        raise ValueError("Subscription title cannot be empty")
+    if "\n" in title or "\r" in title:
+        raise ValueError("Subscription title must be a single line")
+    if len(title) > 128:
+        raise ValueError("Subscription title cannot exceed 128 characters")
+    return title
+
+
 def write_settings(paths: Paths, settings: Settings, *, force: bool = False) -> bool:
     if paths.env_file.exists() and not force:
         return False
@@ -141,7 +162,7 @@ def write_settings(paths: Paths, settings: Settings, *, force: bool = False) -> 
 def load_settings(paths: Paths) -> Settings:
     if not paths.env_file.is_file():
         raise FileNotFoundError(f"Settings file not found: {paths.env_file}")
-    values = dotenv_values(paths.env_file)
+    values = dotenv_values(paths.env_file, interpolate=False)
     domain = validate_domain(str(values.get("DOMAIN", "")))
     email = str(values.get("EMAIL", ""))
     if not email:
@@ -156,6 +177,9 @@ def load_settings(paths: Paths) -> Settings:
         xray_reality_port=int(str(values.get("XRAY_REALITY_PORT", "443"))),
         xray_tls_port=int(str(values.get("XRAY_TLS_PORT", "8443"))),
         fingerprint=str(values.get("FINGERPRINT", "firefox")),
+        subscription_title=validate_subscription_title(
+            str(values.get("SUBSCRIPTION_TITLE", "VPNForge"))
+        ),
     )
 
 

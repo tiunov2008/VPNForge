@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -177,11 +178,15 @@ def template_context(
     settings = settings or load_settings(paths)
     values = load_secrets(paths)
     links = client_links(settings, values)
+    encoded_title = base64.b64encode(
+        settings.subscription_title.encode("utf-8")
+    ).decode("ascii")
     return {
         "settings": settings,
         "secrets": values,
         "client_links": links,
         "subscription_url": f"https://{settings.domain}/{values['subscription_path']}.txt",
+        "subscription_profile_title": f"base64:{encoded_title}",
     }
 
 

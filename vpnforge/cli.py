@@ -5,6 +5,7 @@ from enum import Enum
 import typer
 
 from vpnforge.commands import cert as cert_command
+from vpnforge.commands import config as config_command
 from vpnforge.commands import doctor as doctor_command
 from vpnforge.commands import down as down_command
 from vpnforge.commands import init as init_command
@@ -21,11 +22,13 @@ from vpnforge.commands.common import execute
 
 
 app = typer.Typer(help="Deploy and operate VPNForge.", no_args_is_help=True)
+config_app = typer.Typer(help="Manage VPNForge settings.")
 secrets_app = typer.Typer(help="Manage secret files.")
 nginx_app = typer.Typer(help="Render and activate Nginx configs.")
 cert_app = typer.Typer(help="Manage Let's Encrypt certificates.")
 xray_app = typer.Typer(help="Manage Xray configuration.")
 
+app.add_typer(config_app, name="config")
 app.add_typer(secrets_app, name="secrets")
 app.add_typer(nginx_app, name="nginx")
 app.add_typer(cert_app, name="cert")
@@ -35,6 +38,10 @@ app.add_typer(xray_app, name="xray")
 class Stage(str, Enum):
     bootstrap = "bootstrap"
     final = "final"
+
+
+class ConfigKey(str, Enum):
+    subscription_title = "subscription-title"
 
 
 @app.command("install")
@@ -58,6 +65,14 @@ def init(
 @secrets_app.command("generate")
 def secrets_generate(force: bool = typer.Option(False, "--force")) -> None:
     execute(lambda: secrets_command.run(force))
+
+
+@config_app.command("set")
+def config_set(
+    key: ConfigKey = typer.Argument(...),
+    value: str = typer.Argument(...),
+) -> None:
+    execute(lambda: config_command.set_value(key.value, value))
 
 
 @app.command("render")

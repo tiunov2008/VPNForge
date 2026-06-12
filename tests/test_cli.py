@@ -17,6 +17,9 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         "vpnforge.cli.init_command.run", lambda *args: calls.append("init")
     )
     monkeypatch.setattr(
+        "vpnforge.cli.config_command.set_value", lambda *args: calls.append("config")
+    )
+    monkeypatch.setattr(
         "vpnforge.cli.secrets_command.run", lambda *args: calls.append("secrets")
     )
     monkeypatch.setattr(
@@ -50,6 +53,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
     commands = [
         ["install", "--domain", "example.com"],
         ["init", "--domain", "example.com"],
+        ["config", "set", "subscription-title", "My VPN"],
         ["secrets", "generate"],
         ["render"],
         ["nginx", "render", "--stage", "bootstrap"],
@@ -70,6 +74,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
     assert calls == [
         "install",
         "init",
+        "config",
         "secrets",
         "render",
         "nginx-render",
@@ -89,3 +94,18 @@ def test_init_command_uses_redirected_paths(path_environment):
     result = runner.invoke(app, ["init", "--domain", "example.com"])
     assert result.exit_code == 0, result.output
     assert path_environment.env_file.is_file()
+
+
+def test_config_set_updates_subscription_title(path_environment):
+    init_result = runner.invoke(app, ["init", "--domain", "example.com"])
+    assert init_result.exit_code == 0, init_result.output
+
+    result = runner.invoke(
+        app,
+        ["config", "set", "subscription-title", "Моя подписка"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert 'SUBSCRIPTION_TITLE="Моя подписка"' in path_environment.env_file.read_text(
+        encoding="utf-8"
+    )

@@ -55,6 +55,18 @@ vpnforge uninstall
 vpnforge uninstall --purge
 ```
 
+Change the subscription name sent in the `profile-title` header:
+
+```bash
+vpnforge config set subscription-title "Моя подписка"
+vpnforge nginx render --stage final --force
+vpnforge nginx use final
+vpnforge restart nginx
+```
+
+The title is stored as `SUBSCRIPTION_TITLE` in
+`/etc/vpnforge/vpnforge.env` and rendered as a UTF-8 Base64 value.
+
 `--force` is required to replace changed settings, secrets or rendered files. Repeated commands otherwise preserve existing values.
 
 ## Development

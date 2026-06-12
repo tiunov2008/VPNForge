@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -22,7 +24,11 @@ VALUES = {
 
 def prepare(paths):
     ensure_directories(paths)
-    write_settings(paths, create_settings("vpn.example.com", "admin@example.com"))
+    settings = replace(
+        create_settings("vpn.example.com", "admin@example.com"),
+        subscription_title="Моя подписка",
+    )
+    write_settings(paths, settings)
     for name in SECRET_NAMES:
         atomic_write(secret_path(paths, name), VALUES[name] + "\n", mode=0o600)
 
@@ -48,6 +54,8 @@ def test_rendered_configs_are_valid_and_complete(paths):
     assert "listen 8080 ssl proxy_protocol" in final
     assert "/aabbccddeeff11" in final
     assert "00112233445566778899.txt" in final
+    encoded_title = base64.b64encode("Моя подписка".encode()).decode()
+    assert f'add_header profile-title "base64:{encoded_title}" always;' in final
 
     links = (
         (paths.nginx_html_dir / "subscription.txt")
