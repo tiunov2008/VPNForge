@@ -49,6 +49,9 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
     monkeypatch.setattr(
         "vpnforge.cli.uninstall_command.run", lambda *args: calls.append("uninstall")
     )
+    monkeypatch.setattr(
+        "vpnforge.cli.update_command.run", lambda: calls.append("update")
+    )
 
     commands = [
         ["install", "--domain", "example.com"],
@@ -65,6 +68,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         ["restart", "nginx"],
         ["logs", "xray"],
         ["doctor"],
+        ["update"],
         ["uninstall", "--yes"],
     ]
     for command in commands:
@@ -86,6 +90,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         "restart",
         "logs",
         "doctor",
+        "update",
         "uninstall",
     ]
 

@@ -16,6 +16,7 @@ from vpnforge.commands import render as render_command
 from vpnforge.commands import restart as restart_command
 from vpnforge.commands import secrets as secrets_command
 from vpnforge.commands import uninstall as uninstall_command
+from vpnforge.commands import update as update_command
 from vpnforge.commands import up as up_command
 from vpnforge.commands import xray as xray_command
 from vpnforge.commands.common import execute
@@ -129,6 +130,11 @@ def logs(
 @app.command("doctor")
 def doctor() -> None:
     execute(doctor_command.run)
+
+
+@app.command("update")
+def update() -> None:
+    execute(update_command.run)
 
 
 @app.command("uninstall")

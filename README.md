@@ -51,9 +51,14 @@ vpnforge up
 vpnforge down
 vpnforge logs nginx --follow
 vpnforge logs xray
+vpnforge update
 vpnforge uninstall
 vpnforge uninstall --purge
 ```
+
+`vpnforge update` pulls `origin/main`, reinstalls the package in the current
+virtual environment and runs the updated installer. Existing settings and
+secrets are preserved.
 
 Change the subscription name sent in the `profile-title` header:
 
