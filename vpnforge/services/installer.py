@@ -45,17 +45,28 @@ def install(
     generated = generate_secrets(paths, force=force)
     console.print(f"[green]Secrets ready[/green] ({len(generated)} generated)")
 
-    render_xray(paths, force=force)
-    render_nginx(paths, "bootstrap", force=force)
+    # Generated runtime files are owned by VPNForge and may need migrations
+    # between releases. User settings and secrets still require --force.
+    render_xray(paths, force=True)
+    render_nginx(paths, "bootstrap", force=True)
     use_nginx(paths, "bootstrap")
 
     docker = DockerCompose(paths)
     docker.recreate("nginx")
     issue_certificate(paths, docker)
 
-    render_nginx(paths, "final", force=force)
+    render_nginx(paths, "final", force=True)
+    xray_validation = docker.validate_xray()
+    if xray_validation.returncode != 0:
+        details = xray_validation.stderr.strip() or xray_validation.stdout.strip()
+        raise RuntimeError(f"Xray config validation failed:\n{details}")
     docker.recreate("xray")
     use_nginx(paths, "final")
+    nginx_validation = docker.validate_nginx()
+    if nginx_validation.returncode != 0:
+        use_nginx(paths, "bootstrap")
+        details = nginx_validation.stderr.strip() or nginx_validation.stdout.strip()
+        raise RuntimeError(f"Nginx final config validation failed:\n{details}")
     docker.restart("nginx")
     update_state(paths, installed=True, xray_enabled=True)
 

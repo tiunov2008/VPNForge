@@ -64,11 +64,13 @@ server {
         client_body_buffer_size 1m;
         client_body_timeout 1h;
         client_max_body_size 0;
-        grpc_pass grpc://xray:8411;
+        set $xray_grpc xray:8411;
+        grpc_pass grpc://$xray_grpc;
     }
 
     location /{{ secrets.xhttp_path }} {
-        proxy_pass http://xray:8400;
+        set $xray_http xray:8400;
+        proxy_pass http://$xray_http;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

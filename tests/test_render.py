@@ -40,6 +40,8 @@ def test_rendered_configs_are_valid_and_complete(paths):
         xray["inbounds"][0]["streamSettings"]["realitySettings"]["privateKey"]
         == "private-key"
     )
+    certificates = xray["inbounds"][2]["streamSettings"]["tlsSettings"]["certificates"]
+    assert certificates[0]["keyFile"] == "/etc/xray/cert/privkey.pem"
 
     final = (paths.nginx_dir / "final.conf").read_text(encoding="utf-8")
     assert "{{" not in final

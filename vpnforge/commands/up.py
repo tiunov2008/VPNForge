@@ -4,7 +4,7 @@ from rich.console import Console
 
 from vpnforge.config import Paths, load_settings
 from vpnforge.docker import DockerCompose
-from vpnforge.services.certbot import certificate_exists
+from vpnforge.services.certbot import certificate_exists, sync_xray_certificate
 
 
 console = Console()
@@ -32,5 +32,6 @@ def run(service: str | None) -> None:
             raise FileNotFoundError(
                 "Let's Encrypt certificate is missing; run vpnforge cert issue"
             )
+        sync_xray_certificate(paths, settings.domain)
     DockerCompose(paths).up(services)
     console.print(f"[green]Started:[/green] {', '.join(services)}")

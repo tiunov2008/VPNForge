@@ -76,6 +76,17 @@ class DockerCompose:
             args.append(service)
         self.run(*args)
 
+    def recent_logs(self, service: str, *, tail: int = 50) -> CommandResult:
+        return self.run(
+            "logs",
+            "--no-color",
+            "--tail",
+            str(tail),
+            service,
+            check=False,
+            capture=True,
+        )
+
     def is_running(self, service: str, settings: Settings | None = None) -> bool:
         result = self.run(
             "ps",
@@ -90,6 +101,32 @@ class DockerCompose:
 
     def exec(self, service: str, *command: str, check: bool = True) -> CommandResult:
         return self.run("exec", "-T", service, *command, check=check, capture=True)
+
+    def validate_nginx(self) -> CommandResult:
+        return self.run(
+            "run",
+            "--rm",
+            "--no-deps",
+            "nginx",
+            "nginx",
+            "-t",
+            check=False,
+            capture=True,
+        )
+
+    def validate_xray(self) -> CommandResult:
+        return self.run(
+            "run",
+            "--rm",
+            "--no-deps",
+            "xray",
+            "run",
+            "-test",
+            "-config",
+            "/etc/xray/config.json",
+            check=False,
+            capture=True,
+        )
 
 
 def compose_files_exist(paths: Paths) -> bool:

@@ -14,6 +14,8 @@ from vpnforge.shell import Runner, runner
 
 
 XRAY_IMAGE = "ghcr.io/xtls/xray-core:latest"
+XRAY_RUNTIME_UID = 65532
+XRAY_RUNTIME_GID = 65532
 SECRET_NAMES = (
     "xray_uuid",
     "reality_private_key",
@@ -33,6 +35,13 @@ def secret_path(paths: Paths, name: str) -> Path:
 def _write_secret(path: Path, value: str) -> None:
     atomic_write(path, value.strip() + "\n", mode=0o600)
     os.chmod(path, 0o600)
+
+
+def secure_xray_runtime_path(path: Path, *, directory: bool = False) -> None:
+    mode = 0o700 if directory else 0o600
+    os.chmod(path, mode)
+    if os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0:
+        os.chown(path, XRAY_RUNTIME_UID, XRAY_RUNTIME_GID)
 
 
 def _generate_reality_keys(command_runner: Runner) -> tuple[str, str]:
@@ -179,6 +188,7 @@ def template_context(
 def render_xray(paths: Paths, *, force: bool = False) -> bool:
     content = render_template(paths, "xray/config.json.j2", template_context(paths))
     json.loads(content)
-    return write_rendered(
-        paths.xray_dir / "config.json", content, force=force, mode=0o600
-    )
+    config_path = paths.xray_dir / "config.json"
+    changed = write_rendered(config_path, content, force=force, mode=0o600)
+    secure_xray_runtime_path(config_path)
+    return changed

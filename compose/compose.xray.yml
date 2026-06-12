@@ -11,7 +11,7 @@ services:
       - "${VPNFORGE_XRAY_TLS_PORT:-8443}:8443"
     volumes:
       - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/generated/xray/config.json:/etc/xray/config.json:ro
-      - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/certbot/conf:/etc/letsencrypt:ro
+      - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/generated/xray/cert:/etc/xray/cert:ro
     ulimits:
       nofile:
         soft: 65535

@@ -9,6 +9,7 @@ import pytest
 
 from vpnforge.config import Paths, Settings, ensure_directories, write_settings
 from vpnforge.docker import DockerCompose
+from vpnforge.services.certbot import sync_xray_certificate
 from vpnforge.services.nginx import render_nginx, use_nginx
 from vpnforge.services.xray import generate_secrets, render_xray
 
@@ -61,6 +62,7 @@ def test_compose_nginx_xray_and_webroot(tmp_path: Path):
     )
 
     render_xray(paths)
+    sync_xray_certificate(paths, settings.domain)
     render_nginx(paths, "final")
     use_nginx(paths, "final")
     challenge = paths.certbot_www_dir / ".well-known" / "acme-challenge" / "probe"

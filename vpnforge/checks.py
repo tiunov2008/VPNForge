@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 import shutil
 import socket
 import urllib.error
@@ -115,6 +115,10 @@ def print_checks(checks: list[Check], console: Console | None = None) -> None:
     for check in checks:
         color = colors.get(check.status, "white")
         console.print(f"[{color}][{check.status}][/{color}] {check.message}")
+
+
+def _command_details(stdout: str, stderr: str) -> str:
+    return (stderr.strip() or stdout.strip()).replace("\n", " | ")
 
 
 def run_doctor(paths: Paths) -> list[Check]:
@@ -232,22 +236,45 @@ def run_doctor(paths: Paths) -> list[Check]:
         )
         checks.append(Check("OK" if xray_running else "FAIL", "Xray container running"))
         if nginx_running:
-            valid = docker.exec("nginx", "nginx", "-t", check=False).returncode == 0
+            result = docker.exec("nginx", "nginx", "-t", check=False)
+            valid = result.returncode == 0
             checks.append(Check("OK" if valid else "FAIL", "Nginx config valid"))
+            if not valid:
+                checks.append(
+                    Check(
+                        "FAIL",
+                        f"Nginx validation: {_command_details(result.stdout, result.stderr)}",
+                    )
+                )
+        else:
+            result = docker.recent_logs("nginx")
+            details = _command_details(result.stdout, result.stderr)
+            if details:
+                checks.append(Check("FAIL", f"Nginx logs: {details}"))
         if xray_running:
-            valid = (
-                docker.exec(
-                    "xray",
-                    "xray",
-                    "run",
-                    "-test",
-                    "-config",
-                    "/etc/xray/config.json",
-                    check=False,
-                ).returncode
-                == 0
+            result = docker.exec(
+                "xray",
+                "xray",
+                "run",
+                "-test",
+                "-config",
+                "/etc/xray/config.json",
+                check=False,
             )
+            valid = result.returncode == 0
             checks.append(Check("OK" if valid else "FAIL", "Xray config valid"))
+            if not valid:
+                checks.append(
+                    Check(
+                        "FAIL",
+                        f"Xray validation: {_command_details(result.stdout, result.stderr)}",
+                    )
+                )
+        else:
+            result = docker.recent_logs("xray")
+            details = _command_details(result.stdout, result.stderr)
+            if details:
+                checks.append(Check("FAIL", f"Xray logs: {details}"))
     else:
         checks.append(Check("FAIL", "Container status unavailable"))
 
