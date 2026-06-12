@@ -9,6 +9,7 @@ from vpnforge.commands import config as config_command
 from vpnforge.commands import doctor as doctor_command
 from vpnforge.commands import down as down_command
 from vpnforge.commands import init as init_command
+from vpnforge.commands import hysteria as hysteria_command
 from vpnforge.commands import install as install_command
 from vpnforge.commands import logs as logs_command
 from vpnforge.commands import nginx as nginx_command
@@ -28,12 +29,14 @@ secrets_app = typer.Typer(help="Manage secret files.")
 nginx_app = typer.Typer(help="Render and activate Nginx configs.")
 cert_app = typer.Typer(help="Manage Let's Encrypt certificates.")
 xray_app = typer.Typer(help="Manage Xray configuration.")
+hysteria_app = typer.Typer(help="Manage Hysteria 2 configuration.")
 
 app.add_typer(config_app, name="config")
 app.add_typer(secrets_app, name="secrets")
 app.add_typer(nginx_app, name="nginx")
 app.add_typer(cert_app, name="cert")
 app.add_typer(xray_app, name="xray")
+app.add_typer(hysteria_app, name="hysteria")
 
 
 class Stage(str, Enum):
@@ -43,6 +46,8 @@ class Stage(str, Enum):
 
 class ConfigKey(str, Enum):
     subscription_title = "subscription-title"
+    hysteria_enabled = "hysteria-enabled"
+    hysteria_port_range = "hysteria-port-range"
 
 
 @app.command("install")
@@ -102,6 +107,11 @@ def cert_issue() -> None:
 @xray_app.command("render")
 def xray_render(force: bool = typer.Option(False, "--force")) -> None:
     execute(lambda: xray_command.render(force))
+
+
+@hysteria_app.command("render")
+def hysteria_render(force: bool = typer.Option(False, "--force")) -> None:
+    execute(lambda: hysteria_command.render(force))
 
 
 @app.command("up")

@@ -15,6 +15,7 @@ from vpnforge.files import atomic_write
 DOMAIN_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ENV_UNQUOTED_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+PORT_RANGE_RE = re.compile(r"^(\d{1,5})-(\d{1,5})$")
 
 
 def format_env_value(value: str) -> str:
@@ -70,6 +71,10 @@ class Paths:
         return self.generated_dir / "xray"
 
     @property
+    def hysteria_dir(self) -> Path:
+        return self.generated_dir / "hysteria"
+
+    @property
     def certbot_dir(self) -> Path:
         return self.runtime_dir / "certbot"
 
@@ -99,6 +104,30 @@ class Paths:
 
 
 @dataclass(frozen=True)
+class HysteriaPortRange:
+    start: int = 20000
+    end: int = 50000
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.start <= 65535 or not 1 <= self.end <= 65535:
+            raise ValueError("Hysteria ports must be between 1 and 65535")
+        if self.start >= self.end:
+            raise ValueError("Hysteria port range start must be less than end")
+
+    @classmethod
+    def parse(cls, value: str) -> "HysteriaPortRange":
+        match = PORT_RANGE_RE.fullmatch(value.strip())
+        if not match:
+            raise ValueError(
+                "HYSTERIA_PORT_RANGE must use START-END format, for example 20000-50000"
+            )
+        return cls(start=int(match.group(1)), end=int(match.group(2)))
+
+    def __str__(self) -> str:
+        return f"{self.start}-{self.end}"
+
+
+@dataclass(frozen=True)
 class Settings:
     domain: str
     email: str
@@ -108,6 +137,8 @@ class Settings:
     xray_tls_port: int = 8443
     fingerprint: str = "firefox"
     subscription_title: str = "VPNForge"
+    enable_hysteria: bool = True
+    hysteria_port_range: HysteriaPortRange = HysteriaPortRange()
 
     def as_env(self) -> str:
         return "\n".join(
@@ -120,6 +151,8 @@ class Settings:
                 f"XRAY_TLS_PORT={self.xray_tls_port}",
                 f"FINGERPRINT={self.fingerprint}",
                 f"SUBSCRIPTION_TITLE={format_env_value(self.subscription_title)}",
+                f"ENABLE_HYSTERIA={'true' if self.enable_hysteria else 'false'}",
+                f"HYSTERIA_PORT_RANGE={self.hysteria_port_range}",
                 "",
             ]
         )
@@ -151,6 +184,13 @@ def validate_subscription_title(title: str) -> str:
     return title
 
 
+def parse_bool_setting(value: str, name: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized not in {"true", "false"}:
+        raise ValueError(f"{name} must be true or false")
+    return normalized == "true"
+
+
 def write_settings(paths: Paths, settings: Settings, *, force: bool = False) -> bool:
     if paths.env_file.exists() and not force:
         return False
@@ -172,13 +212,21 @@ def load_settings(paths: Paths) -> Settings:
     return Settings(
         domain=domain,
         email=email,
-        enable_xray=str(values.get("ENABLE_XRAY", "true")).lower() == "true",
+        enable_xray=parse_bool_setting(
+            str(values.get("ENABLE_XRAY", "true")), "ENABLE_XRAY"
+        ),
         nginx_http_port=int(str(values.get("NGINX_HTTP_PORT", "80"))),
         xray_reality_port=int(str(values.get("XRAY_REALITY_PORT", "443"))),
         xray_tls_port=int(str(values.get("XRAY_TLS_PORT", "8443"))),
         fingerprint=str(values.get("FINGERPRINT", "firefox")),
         subscription_title=validate_subscription_title(
             str(values.get("SUBSCRIPTION_TITLE", "VPNForge"))
+        ),
+        enable_hysteria=parse_bool_setting(
+            str(values.get("ENABLE_HYSTERIA", "true")), "ENABLE_HYSTERIA"
+        ),
+        hysteria_port_range=HysteriaPortRange.parse(
+            str(values.get("HYSTERIA_PORT_RANGE", "20000-50000"))
         ),
     )
 
@@ -190,6 +238,7 @@ def ensure_directories(paths: Paths) -> None:
         paths.nginx_dir,
         paths.nginx_html_dir,
         paths.xray_dir,
+        paths.hysteria_dir,
         paths.certbot_www_dir,
         paths.certbot_conf_dir,
         paths.logs_dir,

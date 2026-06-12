@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 import urllib.request
 from pathlib import Path
 
 import pytest
 
-from vpnforge.config import Paths, Settings, ensure_directories, write_settings
+from vpnforge.config import (
+    HysteriaPortRange,
+    Paths,
+    Settings,
+    ensure_directories,
+    write_settings,
+)
 from vpnforge.docker import DockerCompose
 from vpnforge.services.certbot import sync_xray_certificate
+from vpnforge.services.hysteria import render_hysteria, sync_hysteria_certificate
 from vpnforge.services.nginx import render_nginx, use_nginx
 from vpnforge.services.xray import generate_secrets, render_xray
 
@@ -32,6 +40,7 @@ def test_compose_nginx_xray_and_webroot(tmp_path: Path):
         nginx_http_port=18080,
         xray_reality_port=18443,
         xray_tls_port=18444,
+        hysteria_port_range=HysteriaPortRange(19000, 19010),
     )
     ensure_directories(paths)
     write_settings(paths, settings)
@@ -63,6 +72,8 @@ def test_compose_nginx_xray_and_webroot(tmp_path: Path):
 
     render_xray(paths)
     sync_xray_certificate(paths, settings.domain)
+    render_hysteria(paths)
+    sync_hysteria_certificate(paths, settings.domain)
     render_nginx(paths, "final")
     use_nginx(paths, "final")
     challenge = paths.certbot_www_dir / ".well-known" / "acme-challenge" / "probe"
@@ -71,7 +82,7 @@ def test_compose_nginx_xray_and_webroot(tmp_path: Path):
 
     docker = DockerCompose(paths)
     try:
-        docker.up(["nginx", "xray"])
+        docker.up(["nginx", "xray", "hysteria"])
         assert docker.exec("nginx", "nginx", "-t").returncode == 0
         assert (
             docker.exec(
@@ -79,6 +90,11 @@ def test_compose_nginx_xray_and_webroot(tmp_path: Path):
             ).returncode
             == 0
         )
+        for _ in range(20):
+            if docker.is_running("hysteria"):
+                break
+            time.sleep(0.25)
+        assert docker.is_running("hysteria")
         with urllib.request.urlopen(
             "http://127.0.0.1:18080/.well-known/acme-challenge/probe",
             timeout=10,

@@ -11,6 +11,7 @@ COMPOSE_FILES = (
     "compose.nginx.yml",
     "compose.certbot.yml",
     "compose.xray.yml",
+    "compose.hysteria.yml",
 )
 
 
@@ -67,6 +68,9 @@ class DockerCompose:
 
     def recreate(self, service: str) -> None:
         self.run("up", "-d", "--force-recreate", "--no-deps", service)
+
+    def remove(self, service: str) -> None:
+        self.run("rm", "--stop", "--force", service, check=False)
 
     def logs(self, service: str | None = None, *, follow: bool = False) -> None:
         args = ["logs"]

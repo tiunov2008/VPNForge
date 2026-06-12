@@ -1,0 +1,15 @@
+listen: :{{ settings.hysteria_port_range }}
+
+tls:
+  cert: /etc/hysteria/cert/fullchain.pem
+  key: /etc/hysteria/cert/privkey.pem
+  sniGuard: strict
+
+auth:
+  type: password
+  password: {{ secrets.hysteria_password | tojson }}
+
+obfs:
+  type: salamander
+  salamander:
+    password: {{ secrets.hysteria_obfs_password | tojson }}

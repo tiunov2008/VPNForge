@@ -11,6 +11,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "nginx_stage": None,
     "certificate_issued": False,
     "xray_enabled": True,
+    "hysteria_enabled": True,
     "installed": False,
 }
 

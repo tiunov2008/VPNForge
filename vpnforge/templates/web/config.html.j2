@@ -23,6 +23,15 @@
     <button type="button" data-copy="subscription">Copy</button>
     <a class="btn" href="happ://add/{{ subscription_url|e }}">Add to HAPP</a>
   </div>
+{% if settings.enable_hysteria %}
+  <h2>Hysteria 2</h2>
+  <div class="row">
+    <div class="label">Client YAML</div>
+    <div class="code" id="hysteria-yaml">{{ hysteria_client_url|e }}</div>
+    <button type="button" data-copy="hysteria-yaml">Copy</button>
+    <a class="btn" href="{{ hysteria_client_url|e }}">Download</a>
+  </div>
+{% endif %}
   <h2>Configs</h2>
 {% for item in client_links %}
   <div class="row">

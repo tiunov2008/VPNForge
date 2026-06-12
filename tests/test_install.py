@@ -21,6 +21,10 @@ def test_full_install_workflow_order(monkeypatch, paths):
         forces.setdefault("nginx", []).append(kwargs["force"])
         events.append(f"nginx-render-{stage}")
 
+    def render_hysteria(*args, **kwargs):
+        forces["hysteria"] = kwargs["force"]
+        events.append("hysteria-render")
+
     monkeypatch.setattr(
         installer, "assert_install_environment", lambda *args: events.append("checks")
     )
@@ -39,6 +43,7 @@ def test_full_install_workflow_order(monkeypatch, paths):
         "render_nginx",
         render_nginx,
     )
+    monkeypatch.setattr(installer, "render_hysteria", render_hysteria)
     monkeypatch.setattr(
         installer,
         "use_nginx",
@@ -72,6 +77,9 @@ def test_full_install_workflow_order(monkeypatch, paths):
         def restart(self, service):
             events.append("restart-" + service)
 
+        def remove(self, service):
+            events.append("remove-" + service)
+
         def validate_xray(self):
             events.append("validate-xray")
             return CommandResult(0)
@@ -88,6 +96,7 @@ def test_full_install_workflow_order(monkeypatch, paths):
         "checks",
         "secrets",
         "xray-render",
+        "hysteria-render",
         "nginx-render-bootstrap",
         "nginx-use-bootstrap",
         "recreate-nginx",
@@ -95,11 +104,17 @@ def test_full_install_workflow_order(monkeypatch, paths):
         "nginx-render-final",
         "validate-xray",
         "recreate-xray",
+        "recreate-hysteria",
         "nginx-use-final",
         "validate-nginx",
         "restart-nginx",
         "state",
         "doctor",
     ]
-    assert forces == {"secrets": False, "xray": True, "nginx": [True, True]}
+    assert forces == {
+        "secrets": False,
+        "xray": True,
+        "hysteria": True,
+        "nginx": [True, True],
+    }
     assert paths.env_file.is_file()

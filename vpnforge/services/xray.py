@@ -7,6 +7,7 @@ import re
 import secrets as random_secrets
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from vpnforge.config import Paths, Settings, load_settings
 from vpnforge.files import atomic_write
@@ -24,6 +25,8 @@ SECRET_NAMES = (
     "reality_short_id",
     "xhttp_path",
     "subscription_path",
+    "hysteria_password",
+    "hysteria_obfs_password",
 )
 
 
@@ -77,6 +80,8 @@ def generate_secrets(
         "reality_short_id": random_secrets.token_hex(8),
         "xhttp_path": random_secrets.token_hex(6),
         "subscription_path": random_secrets.token_hex(10),
+        "hysteria_password": random_secrets.token_urlsafe(32),
+        "hysteria_obfs_password": random_secrets.token_urlsafe(32),
     }
     for name, value in simple_values.items():
         path = secret_path(paths, name)
@@ -144,7 +149,7 @@ def client_links(settings: Settings, values: dict[str, str]) -> list[dict[str, s
     short_id = values["reality_short_id"]
     reality_port = settings.xray_reality_port
     tls_port = settings.xray_tls_port
-    return [
+    links = [
         {
             "title": "VLESS XHTTP REALITY EXTRA",
             "link": f"vless://{uuid_value}@{domain}:{reality_port}?security=reality&type=xhttp&headerType=&path=%2F{path}&host=&mode=stream-one&extra={EXTRA_QUERY}&sni={domain}&fp={fingerprint}&pbk={public_key}&sid={short_id}&spx=%2F#vlessXHTTPrealityEXTRA-autoXRAY",
@@ -170,6 +175,22 @@ def client_links(settings: Settings, values: dict[str, str]) -> list[dict[str, s
             "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=grpc&headerType=&serviceName={path}11&host=&sni={domain}&fp={fingerprint}&spx=%2F#vlessGRPCtls-autoXRAY",
         },
     ]
+    if settings.enable_hysteria:
+        password = quote(values["hysteria_password"], safe="")
+        obfs_password = quote(values["hysteria_obfs_password"], safe="")
+        server_name = quote(domain, safe="")
+        title = quote(f"Hysteria 2 {settings.subscription_title}", safe="")
+        links.append(
+            {
+                "title": "HYSTERIA 2 PORT HOPPING",
+                "link": (
+                    f"hysteria2://{password}@{domain}:{settings.hysteria_port_range}/"
+                    f"?obfs=salamander&obfs-password={obfs_password}"
+                    f"&sni={server_name}#{title}"
+                ),
+            }
+        )
+    return links
 
 
 def template_context(
@@ -187,6 +208,11 @@ def template_context(
         "client_links": links,
         "subscription_url": f"https://{settings.domain}/{values['subscription_path']}.txt",
         "subscription_profile_title": f"base64:{encoded_title}",
+        "hysteria_client_url": (
+            f"https://{settings.domain}/{values['subscription_path']}.hysteria.yaml"
+            if settings.enable_hysteria
+            else None
+        ),
     }
 
 

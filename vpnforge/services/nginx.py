@@ -26,11 +26,21 @@ def render_nginx(paths: Paths, stage: NginxStage, *, force: bool = False) -> boo
         force=force,
     )
     if stage == "final":
-        for template_name, output_name in (
+        web_outputs = [
             ("web/index.html.j2", "index.html"),
             ("web/config.html.j2", "config.html"),
             ("web/subscription.txt.j2", "subscription.txt"),
-        ):
+        ]
+        settings = context["settings"]
+        secrets = context["secrets"]
+        hysteria_output = f"{secrets['subscription_path']}.hysteria.yaml"
+        for stale in paths.nginx_html_dir.glob("*.hysteria.yaml"):
+            if not settings.enable_hysteria or stale.name != hysteria_output:
+                stale.unlink()
+                changed = True
+        if settings.enable_hysteria:
+            web_outputs.append(("hysteria/client.yaml.j2", hysteria_output))
+        for template_name, output_name in web_outputs:
             changed = (
                 write_rendered(
                     paths.nginx_html_dir / output_name,

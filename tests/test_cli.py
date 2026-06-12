@@ -35,6 +35,10 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
     monkeypatch.setattr(
         "vpnforge.cli.xray_command.render", lambda *args: calls.append("xray-render")
     )
+    monkeypatch.setattr(
+        "vpnforge.cli.hysteria_command.render",
+        lambda *args: calls.append("hysteria-render"),
+    )
     monkeypatch.setattr("vpnforge.cli.up_command.run", lambda *args: calls.append("up"))
     monkeypatch.setattr("vpnforge.cli.down_command.run", lambda: calls.append("down"))
     monkeypatch.setattr(
@@ -63,10 +67,14 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         ["nginx", "use", "final"],
         ["cert", "issue"],
         ["xray", "render"],
+        ["hysteria", "render"],
         ["up", "nginx"],
+        ["up", "hysteria"],
         ["down"],
         ["restart", "nginx"],
+        ["restart", "hysteria"],
         ["logs", "xray"],
+        ["logs", "hysteria"],
         ["doctor"],
         ["update"],
         ["uninstall", "--yes"],
@@ -85,9 +93,13 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         "nginx-use",
         "cert",
         "xray-render",
+        "hysteria-render",
+        "up",
         "up",
         "down",
         "restart",
+        "restart",
+        "logs",
         "logs",
         "doctor",
         "update",
@@ -114,3 +126,19 @@ def test_config_set_updates_subscription_title(path_environment):
     assert 'SUBSCRIPTION_TITLE="Моя подписка"' in path_environment.env_file.read_text(
         encoding="utf-8"
     )
+
+
+def test_config_set_updates_hysteria_settings(path_environment):
+    init_result = runner.invoke(app, ["init", "--domain", "example.com"])
+    assert init_result.exit_code == 0, init_result.output
+
+    enabled_result = runner.invoke(app, ["config", "set", "hysteria-enabled", "false"])
+    range_result = runner.invoke(
+        app, ["config", "set", "hysteria-port-range", "21000-22000"]
+    )
+
+    assert enabled_result.exit_code == 0, enabled_result.output
+    assert range_result.exit_code == 0, range_result.output
+    content = path_environment.env_file.read_text(encoding="utf-8")
+    assert "ENABLE_HYSTERIA=false" in content
+    assert "HYSTERIA_PORT_RANGE=21000-22000" in content

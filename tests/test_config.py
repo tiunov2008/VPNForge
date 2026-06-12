@@ -4,7 +4,10 @@ import os
 import stat
 from dataclasses import replace
 
+import pytest
+
 from vpnforge.config import (
+    HysteriaPortRange,
     create_settings,
     ensure_directories,
     load_settings,
@@ -21,6 +24,8 @@ def test_settings_and_directories_are_idempotent(paths):
     assert write_settings(paths, create_settings("other.example")) is False
     assert load_settings(paths).domain == "example.com"
     assert load_settings(paths).email == "admin@example.com"
+    assert load_settings(paths).enable_hysteria is True
+    assert str(load_settings(paths).hysteria_port_range) == "20000-50000"
     if os.name == "posix":
         assert stat.S_IMODE(paths.secrets_dir.stat().st_mode) == 0o700
         assert stat.S_IMODE(paths.env_file.stat().st_mode) == 0o600
@@ -41,6 +46,32 @@ def test_subscription_title_round_trips_unicode_and_defaults_for_old_config(path
     )
     assert load_settings(paths).subscription_title == "Моя подписка"
 
-    legacy = settings.as_env().replace('SUBSCRIPTION_TITLE="Моя подписка"\n', "")
+    legacy = (
+        settings.as_env()
+        .replace('SUBSCRIPTION_TITLE="Моя подписка"\n', "")
+        .replace("ENABLE_HYSTERIA=true\n", "")
+        .replace("HYSTERIA_PORT_RANGE=20000-50000\n", "")
+    )
     paths.env_file.write_text(legacy, encoding="utf-8")
     assert load_settings(paths).subscription_title == "VPNForge"
+    assert load_settings(paths).enable_hysteria is True
+    assert str(load_settings(paths).hysteria_port_range) == "20000-50000"
+
+
+def test_hysteria_settings_round_trip_and_validate(paths):
+    ensure_directories(paths)
+    settings = replace(
+        create_settings("example.com"),
+        enable_hysteria=False,
+        hysteria_port_range=HysteriaPortRange(21000, 22000),
+    )
+    write_settings(paths, settings)
+
+    loaded = load_settings(paths)
+    assert loaded.enable_hysteria is False
+    assert loaded.hysteria_port_range == HysteriaPortRange(21000, 22000)
+
+    with pytest.raises(ValueError):
+        HysteriaPortRange.parse("50000-20000")
+    with pytest.raises(ValueError):
+        HysteriaPortRange.parse("0-20000")

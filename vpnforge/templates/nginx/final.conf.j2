@@ -56,6 +56,16 @@ server {
         alias /usr/share/nginx/html/config.html;
     }
 
+{% if settings.enable_hysteria %}
+    location = /{{ secrets.subscription_path }}.hysteria.yaml {
+        types { }
+        default_type application/yaml;
+        charset utf-8;
+        add_header Cache-Control "no-store";
+        alias /usr/share/nginx/html/{{ secrets.subscription_path }}.hysteria.yaml;
+    }
+{% endif %}
+
     location /{{ secrets.xhttp_path }}11 {
         if ($request_method != "POST") {
             return 404;

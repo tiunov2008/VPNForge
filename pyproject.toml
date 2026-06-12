@@ -11,12 +11,13 @@ requires-python = ">=3.10"
 dependencies = [
     "Jinja2>=3.1,<4",
     "python-dotenv>=1.0,<2",
+    "PyYAML>=6,<7",
     "rich>=13.7,<15",
     "typer>=0.12,<1",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<9", "PyYAML>=6,<7"]
+test = ["pytest>=8,<9"]
 
 [project.scripts]
 vpnforge = "vpnforge.cli:app"
@@ -27,6 +28,7 @@ include = ["vpnforge*"]
 [tool.setuptools.package-data]
 vpnforge = [
     "templates/nginx/*.j2",
+    "templates/hysteria/*.j2",
     "templates/web/*.j2",
     "templates/xray/*.j2",
 ]

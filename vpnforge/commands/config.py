@@ -5,8 +5,10 @@ from dataclasses import replace
 from rich.console import Console
 
 from vpnforge.config import (
+    HysteriaPortRange,
     Paths,
     load_settings,
+    parse_bool_setting,
     validate_subscription_title,
     write_settings,
 )
@@ -18,13 +20,18 @@ console = Console()
 def set_value(key: str, value: str) -> None:
     paths = Paths.from_env()
     settings = load_settings(paths)
-    if key != "subscription-title":
+    if key == "subscription-title":
+        changes = {"subscription_title": validate_subscription_title(value)}
+    elif key == "hysteria-enabled":
+        changes = {"enable_hysteria": parse_bool_setting(value, "hysteria-enabled")}
+    elif key == "hysteria-port-range":
+        changes = {"hysteria_port_range": HysteriaPortRange.parse(value)}
+    else:
         raise ValueError(f"Unknown setting: {key}")
 
-    title = validate_subscription_title(value)
     write_settings(
         paths,
-        replace(settings, subscription_title=title),
+        replace(settings, **changes),
         force=True,
     )
-    console.print(f"[green]Updated subscription title:[/green] {title}")
+    console.print(f"[green]Updated {key}:[/green] {value.strip()}")

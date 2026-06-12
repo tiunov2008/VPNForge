@@ -8,11 +8,13 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
+import yaml
 from rich.console import Console
 
 from vpnforge.config import Paths, load_settings
 from vpnforge.docker import DockerCompose, compose_files_exist
 from vpnforge.services.certbot import certificate_exists
+from vpnforge.services.hysteria import hysteria_certificate_path
 from vpnforge.services.nginx import active_stage
 from vpnforge.services.xray import SECRET_NAMES, secret_path
 from vpnforge.shell import runner
@@ -31,6 +33,15 @@ def is_root() -> bool:
 def port_available(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(("0.0.0.0", port))
+        except OSError:
+            return False
+    return True
+
+
+def udp_port_available(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         try:
             sock.bind(("0.0.0.0", port))
         except OSError:
@@ -101,10 +112,18 @@ def assert_install_environment(paths: Paths, settings=None) -> None:
             settings.xray_tls_port: "xray",
         }
         for port, service in expected.items():
+            if service == "xray" and not settings.enable_xray:
+                continue
             if not port_available(port) and not (
                 docker and docker.is_running(service, settings)
             ):
                 failures.append(f"Port {port} is already used by another process")
+        if settings.enable_hysteria:
+            port = settings.hysteria_port_range.start
+            if not udp_port_available(port) and not (
+                docker and docker.is_running("hysteria", settings)
+            ):
+                failures.append(f"UDP port {port} is already used by another process")
     if failures:
         raise RuntimeError("; ".join(failures))
 
@@ -201,8 +220,43 @@ def run_doctor(paths: Paths) -> list[Check]:
             checks.append(Check("OK", "Xray config is valid JSON"))
         except (json.JSONDecodeError, OSError):
             checks.append(Check("FAIL", "Xray config is not valid JSON"))
+    hysteria_config = paths.hysteria_dir / "config.yaml"
+    hysteria_client = paths.hysteria_dir / "hysteria-client.yaml"
+    if settings.enable_hysteria:
+        checks.append(
+            Check(
+                "OK" if hysteria_config.is_file() else "FAIL",
+                f"Hysteria config: {hysteria_config}",
+            )
+        )
+        for path, label in (
+            (hysteria_config, "Hysteria server config"),
+            (hysteria_client, "Hysteria client config"),
+        ):
+            if path.is_file():
+                try:
+                    valid = isinstance(
+                        yaml.safe_load(path.read_text(encoding="utf-8")), dict
+                    )
+                except (OSError, yaml.YAMLError):
+                    valid = False
+                checks.append(Check("OK" if valid else "FAIL", f"{label} valid"))
+            else:
+                checks.append(Check("FAIL", f"{label} missing"))
+    else:
+        checks.append(Check("OK", "Hysteria disabled"))
     has_certificate = certificate_exists(paths, settings.domain)
     checks.append(Check("OK" if has_certificate else "FAIL", "Certificate exists"))
+    if settings.enable_hysteria:
+        hysteria_certificates = hysteria_certificate_path(paths)
+        checks.append(
+            Check(
+                "OK"
+                if all(path.is_file() for path in hysteria_certificates)
+                else "FAIL",
+                "Hysteria certificate copy exists",
+            )
+        )
 
     addresses = domain_addresses(settings.domain)
     server_ip = public_ip()
@@ -225,16 +279,40 @@ def run_doctor(paths: Paths) -> list[Check]:
             )
         )
 
-    running_services: dict[str, bool] = {"nginx": False, "xray": False}
+    running_services: dict[str, bool] = {
+        "nginx": False,
+        "xray": False,
+        "hysteria": False,
+    }
     if docker_available() and compose_available():
         docker = DockerCompose(paths)
         nginx_running = docker.is_running("nginx")
         xray_running = docker.is_running("xray")
-        running_services = {"nginx": nginx_running, "xray": xray_running}
+        hysteria_running = docker.is_running("hysteria")
+        running_services = {
+            "nginx": nginx_running,
+            "xray": xray_running,
+            "hysteria": hysteria_running,
+        }
         checks.append(
             Check("OK" if nginx_running else "FAIL", "Nginx container running")
         )
-        checks.append(Check("OK" if xray_running else "FAIL", "Xray container running"))
+        checks.append(
+            Check(
+                "OK" if xray_running == settings.enable_xray else "FAIL",
+                "Xray container running"
+                if settings.enable_xray
+                else "Xray container stopped (disabled)",
+            )
+        )
+        checks.append(
+            Check(
+                "OK" if hysteria_running == settings.enable_hysteria else "FAIL",
+                "Hysteria container running"
+                if settings.enable_hysteria
+                else "Hysteria container stopped (disabled)",
+            )
+        )
         if nginx_running:
             result = docker.exec("nginx", "nginx", "-t", check=False)
             valid = result.returncode == 0
@@ -251,7 +329,7 @@ def run_doctor(paths: Paths) -> list[Check]:
             details = _command_details(result.stdout, result.stderr)
             if details:
                 checks.append(Check("FAIL", f"Nginx logs: {details}"))
-        if xray_running:
+        if settings.enable_xray and xray_running:
             result = docker.exec(
                 "xray",
                 "xray",
@@ -270,19 +348,29 @@ def run_doctor(paths: Paths) -> list[Check]:
                         f"Xray validation: {_command_details(result.stdout, result.stderr)}",
                     )
                 )
-        else:
+        elif settings.enable_xray:
             result = docker.recent_logs("xray")
             details = _command_details(result.stdout, result.stderr)
             if details:
                 checks.append(Check("FAIL", f"Xray logs: {details}"))
+        if settings.enable_hysteria and not hysteria_running:
+            result = docker.recent_logs("hysteria")
+            details = _command_details(result.stdout, result.stderr)
+            if details:
+                checks.append(Check("FAIL", f"Hysteria logs: {details}"))
     else:
         checks.append(Check("FAIL", "Container status unavailable"))
 
     expected_ports = {
         settings.nginx_http_port: "nginx",
-        settings.xray_reality_port: "xray",
-        settings.xray_tls_port: "xray",
     }
+    if settings.enable_xray:
+        expected_ports.update(
+            {
+                settings.xray_reality_port: "xray",
+                settings.xray_tls_port: "xray",
+            }
+        )
     for port, service in expected_ports.items():
         available = port_available(port)
         if not available and running_services[service]:
@@ -295,6 +383,23 @@ def run_doctor(paths: Paths) -> list[Check]:
             )
         else:
             checks.append(Check("WARN", f"Port {port} is free"))
+    if settings.enable_hysteria:
+        udp_port = settings.hysteria_port_range.start
+        udp_available = udp_port_available(udp_port)
+        checks.append(
+            Check(
+                "OK" if not udp_available and running_services["hysteria"] else "FAIL",
+                f"UDP port {udp_port} is occupied by Hysteria"
+                if not udp_available and running_services["hysteria"]
+                else f"UDP port {udp_port} is not listening",
+            )
+        )
+        checks.append(
+            Check(
+                "WARN",
+                f"Verify cloud firewall/UFW allows {settings.hysteria_port_range}/udp",
+            )
+        )
     checks.append(
         Check(
             "OK" if challenge_reachable(settings.domain) else "WARN",

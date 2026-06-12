@@ -1,6 +1,6 @@
 # VPNForge
 
-VPNForge deploys Xray, Nginx and Certbot through a transparent Python CLI. Runtime configuration is generated from Jinja2 templates and stored outside the repository.
+VPNForge deploys Xray, Hysteria 2, Nginx and Certbot through a transparent Python CLI. Runtime configuration is generated from Jinja2 templates and stored outside the repository.
 
 ## Quick Install
 
@@ -32,12 +32,14 @@ Secrets are never stored in `.env`, Compose files or Git.
 vpnforge init --domain example.com
 vpnforge secrets generate
 vpnforge xray render
+vpnforge hysteria render
 vpnforge nginx render --stage bootstrap
 vpnforge nginx use bootstrap
 vpnforge up nginx
 vpnforge cert issue
 vpnforge nginx render --stage final
 vpnforge up xray
+vpnforge up hysteria
 vpnforge nginx use final
 vpnforge restart nginx
 vpnforge doctor
@@ -59,6 +61,25 @@ vpnforge uninstall --purge
 `vpnforge update` pulls `origin/main`, reinstalls the package in the current
 virtual environment and runs the updated installer. Existing settings and
 secrets are preserved.
+
+## Hysteria 2
+
+Hysteria 2 is enabled by default with password authentication, Salamander
+obfuscation and UDP port hopping over `20000-50000`. Allow that UDP range in
+the provider firewall and UFW before installation.
+
+```bash
+vpnforge config set hysteria-port-range 20000-50000
+vpnforge config set hysteria-enabled true
+vpnforge hysteria render --force
+vpnforge restart hysteria
+```
+
+The TXT/HTML subscription contains a `hysteria2://` URI. A complete client
+YAML is available at the secret URL shown on the configuration page. To turn
+the service off, set `hysteria-enabled` to `false`, then run
+`vpnforge render --force`, `vpnforge nginx use final`, `vpnforge restart nginx`
+and `vpnforge up`.
 
 Change the subscription name sent in the `profile-title` header:
 

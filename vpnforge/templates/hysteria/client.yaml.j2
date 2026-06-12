@@ -1,0 +1,23 @@
+server: {{ (settings.domain ~ ':' ~ settings.hysteria_port_range) | tojson }}
+auth: {{ secrets.hysteria_password | tojson }}
+
+tls:
+  sni: {{ settings.domain | tojson }}
+  insecure: false
+
+obfs:
+  type: salamander
+  salamander:
+    password: {{ secrets.hysteria_obfs_password | tojson }}
+
+transport:
+  type: udp
+  udp:
+    minHopInterval: 15s
+    maxHopInterval: 45s
+
+socks5:
+  listen: 127.0.0.1:1080
+
+http:
+  listen: 127.0.0.1:8080

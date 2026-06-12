@@ -66,4 +66,8 @@ def issue_certificate(paths: Paths, docker: DockerCompose | None = None) -> None
     if not certificate_exists(paths, settings.domain):
         raise RuntimeError("Certbot completed but certificate files were not found")
     sync_xray_certificate(paths, settings.domain)
+    if settings.enable_hysteria:
+        from vpnforge.services.hysteria import sync_hysteria_certificate
+
+        sync_hysteria_certificate(paths, settings.domain)
     update_state(paths, certificate_issued=True)
