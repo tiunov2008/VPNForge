@@ -1,0 +1,756 @@
+ТЕХНИЧЕСКОЕ ЗАДАНИЕ
+VPNForge v1: архитектура развёртывания Xray + Nginx + Certbot
+
+Версия: 0.1
+Текущий этап: базовая архитектура без Hysteria, sing-box, WARP и других будущих модулей.
+
+
+1. ЦЕЛЬ ПРОЕКТА
+
+VPNForge — инструмент для быстрого развёртывания VPN/proxy-сервера в Docker.
+
+Цель первой версии — сделать систему, которая:
+
+- легко устанавливается обычным пользователем;
+- запускает полную установку одной командой;
+- остаётся удобной для разработки и отладки;
+- не превращается в один большой bash-файл;
+- имеет прозрачную, понятную и модульную архитектуру;
+- позволяет выполнять установку как полностью автоматически, так и поэтапно.
+
+На первом этапе VPNForge должен поддерживать только:
+
+- Xray;
+- Nginx;
+- Certbot / Let's Encrypt;
+- Docker Compose;
+- Python CLI;
+- генерацию конфигов через Jinja2;
+- хранение секретов отдельно от .env и docker-compose.yml;
+- два режима nginx-конфига: bootstrap и final.
+
+Hysteria, sing-box, WARP, NaiveProxy и другие компоненты будут добавлены позже как отдельные модули.
+
+
+2. ГЛАВНЫЙ ПРИНЦИП АРХИТЕКТУРЫ
+
+Пользовательский сценарий должен быть максимально простым.
+
+Пользователь устанавливает VPNForge, а затем запускает одну команду:
+
+vpnforge install --domain example.com
+
+После этого VPNForge должен сам выполнить полный цикл установки:
+
+1. проверить окружение;
+2. создать директории;
+3. создать конфигурационный env-файл;
+4. сгенерировать секреты;
+5. сгенерировать временный nginx-конфиг;
+6. запустить Nginx в bootstrap-режиме;
+7. выпустить сертификат через Certbot;
+8. сгенерировать итоговый nginx-конфиг;
+9. сгенерировать Xray-конфиг;
+10. запустить Xray;
+11. переключить Nginx на final-конфиг;
+12. перезапустить или перезагрузить Nginx;
+13. выполнить диагностику.
+
+При этом для разработки и отладки каждая стадия должна быть доступна отдельной командой.
+
+Примеры поэтапного режима:
+
+vpnforge init --domain example.com
+vpnforge secrets generate
+vpnforge render
+vpnforge nginx use bootstrap
+vpnforge up nginx
+vpnforge cert issue
+vpnforge render
+vpnforge up xray
+vpnforge nginx use final
+vpnforge restart nginx
+vpnforge doctor
+
+Таким образом, VPNForge должен поддерживать два режима работы:
+
+1. Автоматический режим — одна команда для пользователя.
+2. Поэтапный режим — отдельные команды для разработки, тестирования и отладки.
+
+
+3. ТРЕБОВАНИЕ К ПРОЗРАЧНОСТИ КОДА
+
+Код проекта должен быть максимально понятным и предсказуемым.
+
+Запрещается:
+
+- хранить всю логику в одном bash-файле;
+- смешивать установку Docker, генерацию конфигов, выпуск сертификатов и запуск сервисов в одной большой функции;
+- скрывать важные действия без вывода в консоль;
+- молча перезаписывать важные файлы без понятной логики;
+- хранить секреты в docker-compose.yml;
+- хранить секреты в .env;
+- генерировать конфиги прямо внутри docker-compose.yml.
+
+Требуется:
+
+- каждая команда должна делать одну понятную задачу;
+- каждая стадия установки должна быть доступна отдельно;
+- основные действия должны выводиться в консоль;
+- ошибки должны быть понятными;
+- команды должны быть пригодны для повторного запуска там, где это возможно;
+- структура проекта должна позволять легко добавлять новые сервисы;
+- для каждого сервиса должен быть отдельный модуль;
+- для каждого конфига должен быть отдельный шаблон;
+- runtime-файлы должны храниться вне Git.
+
+Пример хорошей логики:
+
+vpnforge install
+
+внутри вызывает последовательность понятных функций:
+
+init_directories()
+write_env()
+generate_secrets()
+render_nginx_bootstrap()
+use_nginx_bootstrap()
+docker_up_nginx()
+issue_certificate()
+render_xray()
+render_nginx_final()
+docker_up_xray()
+use_nginx_final()
+reload_nginx()
+doctor()
+
+Но каждая из этих стадий также должна быть доступна через отдельную CLI-команду.
+
+
+4. РОЛЬ BASH
+
+Bash используется только как загрузчик.
+
+install.sh не должен содержать основную бизнес-логику.
+
+Задачи install.sh:
+
+1. проверить, что передан домен;
+2. проверить root-права;
+3. установить минимальные зависимости, если они отсутствуют;
+4. скачать VPNForge в /opt/VPNForge;
+5. установить Python-пакет;
+6. вызвать:
+
+vpnforge install --domain example.com
+
+Пример пользовательской установки:
+
+curl -fsSL https://raw.githubusercontent.com/USER/VPNForge/main/install.sh | bash -s -- example.com
+
+Вся логика установки должна быть реализована в Python CLI.
+
+
+5. ТЕХНОЛОГИЧЕСКИЙ СТЕК
+
+Основные технологии:
+
+- Python 3.10+;
+- Typer для CLI;
+- Rich для красивого и понятного вывода;
+- Jinja2 для генерации конфигов;
+- python-dotenv для чтения env-файла;
+- Docker;
+- Docker Compose;
+- Nginx;
+- Certbot;
+- Xray.
+
+Файл pyproject.toml должен описывать зависимости и создавать CLI-команду vpnforge.
+
+
+6. СТРУКТУРА ПРОЕКТА
+
+Рекомендуемая структура репозитория:
+
+VPNForge/
+├── install.sh
+├── pyproject.toml
+├── README.md
+├── .gitignore
+│
+├── vpnforge/
+│   ├── __init__.py
+│   ├── cli.py
+│   ├── config.py
+│   ├── render.py
+│   ├── shell.py
+│   ├── docker.py
+│   ├── checks.py
+│   ├── state.py
+│   │
+│   ├── commands/
+│   │   ├── install.py
+│   │   ├── init.py
+│   │   ├── render.py
+│   │   ├── up.py
+│   │   ├── down.py
+│   │   ├── restart.py
+│   │   ├── logs.py
+│   │   ├── doctor.py
+│   │   ├── cert.py
+│   │   └── uninstall.py
+│   │
+│   ├── services/
+│   │   ├── nginx.py
+│   │   ├── certbot.py
+│   │   └── xray.py
+│   │
+│   └── templates/
+│       ├── nginx/
+│       │   ├── bootstrap.conf.j2
+│       │   └── final.conf.j2
+│       ├── xray/
+│       │   └── config.json.j2
+│       └── docker/
+│           └── docker-compose.yml.j2
+│
+└── compose/
+    ├── compose.base.yml
+    ├── compose.nginx.yml
+    ├── compose.certbot.yml
+    └── compose.xray.yml
+
+
+7. РАЗМЕЩЕНИЕ ФАЙЛОВ НА СЕРВЕРЕ
+
+Проект:
+
+/opt/VPNForge/
+
+Настройки:
+
+/etc/vpnforge/
+├── vpnforge.env
+└── secrets/
+    ├── xray_uuid
+    └── fallback_secret
+
+Runtime-файлы:
+
+/var/lib/vpnforge/
+├── generated/
+│   ├── nginx/
+│   │   ├── bootstrap.conf
+│   │   ├── final.conf
+│   │   └── active.conf
+│   └── xray/
+│       └── config.json
+│
+├── certbot/
+│   ├── www/
+│   └── conf/
+│
+├── logs/
+└── state.json
+
+
+8. НАСТРОЙКИ И СЕКРЕТЫ
+
+Обычные настройки хранятся в файле:
+
+/etc/vpnforge/vpnforge.env
+
+Пример:
+
+DOMAIN=example.com
+EMAIL=admin@example.com
+ENABLE_XRAY=true
+NGINX_HTTP_PORT=80
+NGINX_HTTPS_PORT=443
+XRAY_INTERNAL_PORT=10000
+
+Секреты хранятся отдельными текстовыми файлами:
+
+/etc/vpnforge/secrets/xray_uuid
+/etc/vpnforge/secrets/fallback_secret
+
+Секреты не должны храниться:
+
+- в Git;
+- в .env;
+- в docker-compose.yml;
+- в README;
+- в логах.
+
+Права доступа:
+
+chmod 700 /etc/vpnforge/secrets
+chmod 600 /etc/vpnforge/secrets/*
+chown -R root:root /etc/vpnforge/secrets
+
+Секреты являются обычными текстовыми файлами без обязательного расширения .txt, где внутри хранится одно значение.
+
+
+9. ГЕНЕРАЦИЯ КОНФИГОВ
+
+Конфиги должны генерироваться из Jinja2-шаблонов.
+
+Исходные шаблоны:
+
+vpnforge/templates/nginx/bootstrap.conf.j2
+vpnforge/templates/nginx/final.conf.j2
+vpnforge/templates/xray/config.json.j2
+
+Готовые файлы:
+
+/var/lib/vpnforge/generated/nginx/bootstrap.conf
+/var/lib/vpnforge/generated/nginx/final.conf
+/var/lib/vpnforge/generated/nginx/active.conf
+/var/lib/vpnforge/generated/xray/config.json
+
+Команда полной генерации:
+
+vpnforge render
+
+Отдельные команды:
+
+vpnforge nginx render --stage bootstrap
+vpnforge nginx render --stage final
+vpnforge nginx use bootstrap
+vpnforge nginx use final
+vpnforge xray render
+
+В Docker-контейнер Nginx должен монтироваться только active.conf:
+
+/var/lib/vpnforge/generated/nginx/active.conf:/etc/nginx/conf.d/default.conf:ro
+
+Python CLI отвечает за то, какой nginx-конфиг сейчас активен.
+
+
+10. NGINX: ДВА РЕЖИМА КОНФИГА
+
+Nginx должен поддерживать два режима:
+
+1. bootstrap;
+2. final.
+
+10.1. Bootstrap-конфиг
+
+Bootstrap-конфиг — временный HTTP-конфиг, который нужен для первого выпуска сертификата Let's Encrypt через HTTP-01 challenge.
+
+Задачи bootstrap-конфига:
+
+- слушать 80 порт;
+- принимать запросы к /.well-known/acme-challenge/;
+- отдавать challenge-файлы из директории Certbot webroot;
+- не использовать SSL-сертификаты;
+- не проксировать трафик на Xray;
+- позволять Certbot подтвердить домен.
+
+Пример логики:
+
+server {
+    listen 80;
+    server_name example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        allow all;
+    }
+
+    location / {
+        return 200 "VPNForge bootstrap nginx is running\n";
+    }
+}
+
+10.2. Final-конфиг
+
+Final-конфиг — итоговый HTTPS-конфиг после успешного выпуска сертификата.
+
+Задачи final-конфига:
+
+- слушать 80 порт;
+- сохранять доступ к /.well-known/acme-challenge/ для последующего продления сертификатов;
+- перенаправлять основной HTTP-трафик на HTTPS;
+- слушать 443 порт;
+- использовать сертификаты Let's Encrypt;
+- проксировать нужный трафик на Xray.
+
+Пример логики:
+
+server {
+    listen 80;
+    server_name example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        allow all;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+
+    ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://xray:10000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+Конкретный location, порт и режим проксирования могут быть изменены в зависимости от выбранного транспорта Xray.
+
+
+11. CERTBOT
+
+Certbot должен работать в Docker.
+
+Задачи Certbot:
+
+- выпускать сертификат Let's Encrypt через HTTP-01 challenge;
+- использовать webroot;
+- сохранять сертификаты в /var/lib/vpnforge/certbot/conf;
+- использовать challenge-директорию /var/lib/vpnforge/certbot/www.
+
+Основная команда:
+
+vpnforge cert issue
+
+В будущем нужно добавить:
+
+vpnforge cert renew
+
+Certbot не должен запускаться до того, как Nginx запущен в bootstrap-режиме.
+
+
+12. XRAY
+
+Xray должен работать в Docker.
+
+Задачи Xray:
+
+- использовать сгенерированный config.json;
+- получать UUID из /etc/vpnforge/secrets/xray_uuid;
+- не хранить секреты в compose-файле;
+- запускаться только после генерации конфигурации;
+- быть доступным для Nginx внутри docker-сети по имени сервиса xray.
+
+Конфиг монтируется read-only:
+
+/var/lib/vpnforge/generated/xray/config.json:/etc/xray/config.json:ro
+
+
+13. DOCKER COMPOSE
+
+Docker Compose должен быть модульным.
+
+Базовый файл:
+
+compose/compose.base.yml
+
+Отдельные сервисы:
+
+compose/compose.nginx.yml
+compose/compose.certbot.yml
+compose/compose.xray.yml
+
+Запуск сервисов выполняется через Python CLI, а не вручную пользователем.
+
+Пример внутренней команды:
+
+docker compose \
+  -f compose/compose.base.yml \
+  -f compose/compose.nginx.yml \
+  -f compose/compose.xray.yml \
+  up -d
+
+Для пользователя это должно быть скрыто за командой:
+
+vpnforge up
+
+Или отдельно:
+
+vpnforge up nginx
+vpnforge up xray
+
+
+14. ОСНОВНЫЕ CLI-КОМАНДЫ
+
+VPNForge v1 должен поддерживать следующие команды:
+
+vpnforge install --domain example.com
+Полная установка одной командой.
+
+vpnforge init --domain example.com
+Создание директорий и базового env-файла.
+
+vpnforge secrets generate
+Генерация секретов.
+
+vpnforge render
+Генерация всех конфигов.
+
+vpnforge nginx render --stage bootstrap
+Генерация временного nginx-конфига.
+
+vpnforge nginx render --stage final
+Генерация итогового nginx-конфига.
+
+vpnforge nginx use bootstrap
+Активация временного nginx-конфига.
+
+vpnforge nginx use final
+Активация итогового nginx-конфига.
+
+vpnforge cert issue
+Первичный выпуск сертификата.
+
+vpnforge xray render
+Генерация Xray-конфига.
+
+vpnforge up
+Запуск всех сервисов.
+
+vpnforge up nginx
+Запуск только Nginx.
+
+vpnforge up xray
+Запуск только Xray.
+
+vpnforge down
+Остановка сервисов.
+
+vpnforge restart nginx
+Перезапуск Nginx.
+
+vpnforge logs
+Просмотр логов всех сервисов.
+
+vpnforge logs nginx
+Просмотр логов Nginx.
+
+vpnforge logs xray
+Просмотр логов Xray.
+
+vpnforge doctor
+Диагностика состояния сервера и установки.
+
+vpnforge uninstall
+Удаление контейнеров и runtime-файлов с подтверждением.
+
+
+15. ЛОГИКА ПОЛНОЙ УСТАНОВКИ
+
+Команда:
+
+vpnforge install --domain example.com
+
+должна выполнять следующий сценарий:
+
+1. Проверить root-права.
+2. Проверить наличие Docker.
+3. Проверить наличие Docker Compose.
+4. Проверить доступность портов 80 и 443.
+5. Создать директории /etc/vpnforge и /var/lib/vpnforge.
+6. Создать /etc/vpnforge/vpnforge.env.
+7. Сгенерировать секреты Xray.
+8. Сгенерировать Xray config.
+9. Сгенерировать nginx bootstrap config.
+10. Сделать bootstrap config активным.
+11. Запустить Nginx.
+12. Выпустить сертификат через Certbot.
+13. Сгенерировать nginx final config.
+14. Запустить Xray.
+15. Сделать final config активным.
+16. Перезапустить или reload Nginx.
+17. Выполнить vpnforge doctor.
+18. Вывести пользователю итоговую информацию.
+
+Итоговая информация должна включать:
+
+- домен;
+- статус Nginx;
+- статус Xray;
+- статус сертификата;
+- путь к конфигам;
+- путь к секретам;
+- команды для просмотра логов и диагностики.
+
+
+16. СОСТОЯНИЕ УСТАНОВКИ
+
+VPNForge должен хранить техническое состояние установки в файле:
+
+/var/lib/vpnforge/state.json
+
+Пример:
+
+{
+  "nginx_stage": "final",
+  "certificate_issued": true,
+  "xray_enabled": true,
+  "installed": true
+}
+
+state.json нужен только для внутренней логики VPNForge.
+
+Нельзя использовать state.json как единственный источник истины. Команда doctor должна проверять реальное состояние файлов, контейнеров, портов и сертификатов.
+
+
+17. ДИАГНОСТИКА
+
+Команда:
+
+vpnforge doctor
+
+должна проверять:
+
+- запущен ли пользователь от root;
+- установлен ли Docker;
+- доступен ли Docker Compose;
+- существует ли /etc/vpnforge/vpnforge.env;
+- существуют ли секреты;
+- сгенерированы ли конфиги;
+- какой nginx-конфиг активен;
+- существуют ли сертификаты;
+- свободны ли нужные порты или заняты ожидаемыми контейнерами;
+- запущен ли Nginx;
+- запущен ли Xray;
+- указывает ли домен на IP сервера;
+- доступен ли HTTP challenge path;
+- валиден ли nginx-конфиг;
+- валиден ли xray-конфиг.
+
+Вывод должен быть понятным:
+
+[OK] Docker installed
+[OK] Docker Compose available
+[OK] Domain resolves to this server
+[OK] Nginx active config: final
+[OK] Certificate exists
+[OK] Xray container running
+[WARN] Certbot renew timer not configured
+[FAIL] Port 80 is used by another process
+
+
+18. ТРЕБОВАНИЯ К ПОВТОРНОМУ ЗАПУСКУ
+
+Команды должны быть по возможности идемпотентными.
+
+Повторный запуск:
+
+vpnforge install --domain example.com
+
+не должен без необходимости ломать существующую установку.
+
+Если файлы уже существуют, VPNForge должен:
+
+- не перегенерировать секреты без явного указания;
+- не удалять сертификаты без подтверждения;
+- не перезаписывать env без понятной логики;
+- предупреждать о конфликтующих файлах;
+- позволять использовать флаг --force для осознанного перезаписывания.
+
+Примеры будущих флагов:
+
+vpnforge secrets generate --force
+vpnforge render --force
+vpnforge install --domain example.com --force
+
+
+19. ЧТО НЕ ВХОДИТ В V1
+
+В первую версию не входят:
+
+- Hysteria;
+- sing-box;
+- WARP;
+- NaiveProxy;
+- Cloudflare API;
+- веб-интерфейс;
+- multi-user панель;
+- автоматическая генерация клиентских QR-кодов;
+- управление несколькими доменами;
+- сложная система обновлений;
+- GUI;
+- аналитика трафика.
+
+
+20. ТРЕБОВАНИЕ К БУДУЩЕМУ РАСШИРЕНИЮ
+
+Архитектура должна позволять позже добавить новые сервисы без переписывания ядра.
+
+Будущие сервисы должны добавляться по той же схеме:
+
+1. отдельный модуль в vpnforge/services/;
+2. отдельные команды, если нужны;
+3. отдельные Jinja2-шаблоны;
+4. отдельный compose-файл;
+5. отдельные проверки в doctor;
+6. отдельные секреты, если нужны.
+
+Пример будущего расширения:
+
+vpnforge/services/hysteria.py
+vpnforge/templates/hysteria/config.yaml.j2
+compose/compose.hysteria.yml
+
+Команды:
+
+vpnforge hysteria render
+vpnforge up hysteria
+vpnforge logs hysteria
+
+
+21. .GITIGNORE
+
+В .gitignore обязательно добавить:
+
+.env
+*.env
+runtime/
+generated/
+secrets/
+*.pem
+*.key
+*.crt
+state.json
+__pycache__/
+.venv/
+dist/
+build/
+*.egg-info/
+
+
+22. ИТОГОВЫЙ ПРИНЦИП
+
+VPNForge должен быть простым снаружи и прозрачным внутри.
+
+Для обычного пользователя:
+
+vpnforge install --domain example.com
+
+Для разработчика:
+
+vpnforge init --domain example.com
+vpnforge secrets generate
+vpnforge render
+vpnforge nginx use bootstrap
+vpnforge up nginx
+vpnforge cert issue
+vpnforge up xray
+vpnforge nginx use final
+vpnforge restart nginx
+vpnforge doctor
+
+Это позволит сохранить простоту установки, но не потерять управляемость, читаемость и удобство разработки.

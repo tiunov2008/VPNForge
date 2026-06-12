@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vpnforge"
+version = "0.1.0"
+description = "Transparent Xray, Nginx and Certbot deployment CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Jinja2>=3.1,<4",
+    "python-dotenv>=1.0,<2",
+    "rich>=13.7,<15",
+    "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9", "PyYAML>=6,<7"]
+
+[project.scripts]
+vpnforge = "vpnforge.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["vpnforge*"]
+
+[tool.setuptools.package-data]
+vpnforge = [
+    "templates/nginx/*.j2",
+    "templates/web/*.j2",
+    "templates/xray/*.j2",
+]
+
+[tool.setuptools.data-files]
+"share/vpnforge/compose" = ["compose/*.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["integration: requires Linux, Docker and OpenSSL"]

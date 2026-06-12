@@ -1,0 +1,94 @@
+server {
+    listen 80;
+    server_name {{ settings.domain }};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        allow all;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    server_name {{ settings.domain }};
+    listen 8080 ssl proxy_protocol;
+    listen 8081 proxy_protocol;
+    listen 8082 proxy_protocol;
+    http2 on;
+
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    set_real_ip_from 10.0.0.0/8;
+    real_ip_header proxy_protocol;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:VPNForgeSSL:10m;
+    ssl_session_tickets off;
+    ssl_certificate /etc/letsencrypt/live/{{ settings.domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ settings.domain }}/privkey.pem;
+
+    grpc_read_timeout 1h;
+    grpc_send_timeout 1h;
+    grpc_set_header X-Real-IP $remote_addr;
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    location = /{{ secrets.subscription_path }}.txt {
+        types { }
+        default_type text/plain;
+        charset utf-8;
+        add_header profile-title "base64:YXV0b1hSQVk=";
+        add_header Cache-Control "no-store";
+        alias /usr/share/nginx/html/subscription.txt;
+    }
+
+    location = /{{ secrets.subscription_path }}.html {
+        default_type text/html;
+        add_header Cache-Control "no-store";
+        alias /usr/share/nginx/html/config.html;
+    }
+
+    location /{{ secrets.xhttp_path }}11 {
+        if ($request_method != "POST") {
+            return 404;
+        }
+
+        client_body_buffer_size 1m;
+        client_body_timeout 1h;
+        client_max_body_size 0;
+        grpc_pass grpc://xray:8411;
+    }
+
+    location /{{ secrets.xhttp_path }} {
+        proxy_pass http://xray:8400;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /config.html {
+        return 404;
+    }
+
+    location = /subscription.txt {
+        return 404;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

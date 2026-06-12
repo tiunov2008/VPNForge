@@ -1,0 +1,15 @@
+.env
+*.env
+runtime/
+generated/
+secrets/
+*.pem
+*.key
+*.crt
+state.json
+__pycache__/
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/

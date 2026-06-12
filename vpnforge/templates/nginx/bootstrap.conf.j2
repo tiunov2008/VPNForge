@@ -1,0 +1,14 @@
+server {
+    listen 80;
+    server_name {{ settings.domain }};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        allow all;
+    }
+
+    location / {
+        default_type text/plain;
+        return 200 "VPNForge bootstrap nginx is running\n";
+    }
+}

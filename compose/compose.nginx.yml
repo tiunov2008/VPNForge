@@ -1,0 +1,14 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: vpnforge-nginx
+    restart: unless-stopped
+    networks:
+      - vpnforge
+    ports:
+      - "${VPNFORGE_NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/generated/nginx/active.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/generated/nginx/html:/usr/share/nginx/html:ro
+      - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/certbot/www:/var/www/certbot:ro
+      - ${VPNFORGE_RUNTIME_DIR:-/var/lib/vpnforge}/certbot/conf:/etc/letsencrypt:ro
