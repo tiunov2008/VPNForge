@@ -26,6 +26,8 @@ def set_value(key: str, value: str) -> None:
         changes = {"enable_hysteria": parse_bool_setting(value, "hysteria-enabled")}
     elif key == "hysteria-port-range":
         changes = {"hysteria_port_range": HysteriaPortRange.parse(value)}
+    elif key == "bbr-enabled":
+        changes = {"enable_bbr": parse_bool_setting(value, "bbr-enabled")}
     else:
         raise ValueError(f"Unknown setting: {key}")
 

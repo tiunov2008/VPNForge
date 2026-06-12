@@ -26,6 +26,7 @@ def test_settings_and_directories_are_idempotent(paths):
     assert load_settings(paths).email == "admin@example.com"
     assert load_settings(paths).enable_hysteria is True
     assert str(load_settings(paths).hysteria_port_range) == "20000-50000"
+    assert load_settings(paths).enable_bbr is False
     if os.name == "posix":
         assert stat.S_IMODE(paths.secrets_dir.stat().st_mode) == 0o700
         assert stat.S_IMODE(paths.env_file.stat().st_mode) == 0o600
@@ -51,11 +52,13 @@ def test_subscription_title_round_trips_unicode_and_defaults_for_old_config(path
         .replace('SUBSCRIPTION_TITLE="Моя подписка"\n', "")
         .replace("ENABLE_HYSTERIA=true\n", "")
         .replace("HYSTERIA_PORT_RANGE=20000-50000\n", "")
+        .replace("ENABLE_BBR=false\n", "")
     )
     paths.env_file.write_text(legacy, encoding="utf-8")
     assert load_settings(paths).subscription_title == "VPNForge"
     assert load_settings(paths).enable_hysteria is True
     assert str(load_settings(paths).hysteria_port_range) == "20000-50000"
+    assert load_settings(paths).enable_bbr is False
 
 
 def test_hysteria_settings_round_trip_and_validate(paths):

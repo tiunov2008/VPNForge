@@ -30,6 +30,11 @@ def test_full_install_workflow_order(monkeypatch, paths):
     )
     monkeypatch.setattr(
         installer,
+        "configure_bbr",
+        lambda _paths, enabled: events.append(f"bbr-{enabled}"),
+    )
+    monkeypatch.setattr(
+        installer,
         "generate_secrets",
         generate_secrets,
     )
@@ -94,6 +99,7 @@ def test_full_install_workflow_order(monkeypatch, paths):
 
     assert events == [
         "checks",
+        "bbr-False",
         "secrets",
         "xray-render",
         "hysteria-render",

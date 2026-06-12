@@ -152,27 +152,27 @@ def client_links(settings: Settings, values: dict[str, str]) -> list[dict[str, s
     links = [
         {
             "title": "VLESS XHTTP REALITY EXTRA",
-            "link": f"vless://{uuid_value}@{domain}:{reality_port}?security=reality&type=xhttp&headerType=&path=%2F{path}&host=&mode=stream-one&extra={EXTRA_QUERY}&sni={domain}&fp={fingerprint}&pbk={public_key}&sid={short_id}&spx=%2F#vlessXHTTPrealityEXTRA-autoXRAY",
+            "link": f"vless://{uuid_value}@{domain}:{reality_port}?security=reality&type=xhttp&headerType=&path=%2F{path}&host=&mode=stream-one&extra={EXTRA_QUERY}&sni={domain}&fp={fingerprint}&pbk={public_key}&sid={short_id}&spx=%2F#vlessXHTTPrealityEXTRA-VPNForge",
         },
         {
             "title": "VLESS RAW REALITY VISION",
-            "link": f"vless://{uuid_value}@{domain}:{reality_port}?security=reality&type=tcp&headerType=&path=&host=&flow=xtls-rprx-vision&sni={domain}&fp={fingerprint}&pbk={public_key}&sid={short_id}&spx=%2F#vlessRAWrealityVISION-autoXRAY",
+            "link": f"vless://{uuid_value}@{domain}:{reality_port}?security=reality&type=tcp&headerType=&path=&host=&flow=xtls-rprx-vision&sni={domain}&fp={fingerprint}&pbk={public_key}&sid={short_id}&spx=%2F#vlessRAWrealityVISION-VPNForge",
         },
         {
             "title": "VLESS RAW TLS VISION",
-            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=tcp&headerType=&path=&host=&flow=xtls-rprx-vision&sni={domain}&fp={fingerprint}&spx=%2F#vlessRAWtlsVision-autoXRAY",
+            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=tcp&headerType=&path=&host=&flow=xtls-rprx-vision&sni={domain}&fp={fingerprint}&spx=%2F#vlessRAWtlsVision-VPNForge",
         },
         {
             "title": "VLESS XHTTP TLS EXTRA",
-            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=xhttp&headerType=&path=%2F{path}&host=&mode=auto&extra={EXTRA_QUERY}&sni={domain}&fp={fingerprint}&spx=%2F#vlessXHTTPtls-autoXRAY",
+            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=xhttp&headerType=&path=%2F{path}&host=&mode=auto&extra={EXTRA_QUERY}&sni={domain}&fp={fingerprint}&spx=%2F#vlessXHTTPtls-VPNForge",
         },
         {
             "title": "VLESS WS TLS",
-            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=ws&headerType=&path=%2F{path}22&host=&sni={domain}&fp={fingerprint}&spx=%2F#vlessWStls-autoXRAY",
+            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=ws&headerType=&path=%2F{path}22&host=&sni={domain}&fp={fingerprint}&spx=%2F#vlessWStls-VPNForge",
         },
         {
             "title": "VLESS GRPC TLS",
-            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=grpc&headerType=&serviceName={path}11&host=&sni={domain}&fp={fingerprint}&spx=%2F#vlessGRPCtls-autoXRAY",
+            "link": f"vless://{uuid_value}@{domain}:{tls_port}?security=tls&type=grpc&headerType=&serviceName={path}11&host=&sni={domain}&fp={fingerprint}&spx=%2F#vlessGRPCtls-VPNForge",
         },
     ]
     if settings.enable_hysteria:

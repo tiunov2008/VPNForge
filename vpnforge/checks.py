@@ -13,6 +13,7 @@ from rich.console import Console
 
 from vpnforge.config import Paths, load_settings
 from vpnforge.docker import DockerCompose, compose_files_exist
+from vpnforge.services.bbr import bbr_config_path, bbr_status, is_linux
 from vpnforge.services.certbot import certificate_exists
 from vpnforge.services.hysteria import hysteria_certificate_path
 from vpnforge.services.nginx import active_stage
@@ -162,6 +163,46 @@ def run_doctor(paths: Paths) -> list[Check]:
     except (FileNotFoundError, ValueError) as error:
         checks.append(Check("FAIL", str(error)))
         return checks
+
+    if settings.enable_bbr:
+        if not is_linux():
+            checks.append(Check("FAIL", "BBR enabled in config but host is not Linux"))
+        else:
+            status = bbr_status()
+            checks.append(
+                Check(
+                    "OK" if status.available else "FAIL",
+                    "TCP BBR available in kernel",
+                )
+            )
+            checks.append(
+                Check(
+                    "OK" if status.active else "FAIL",
+                    "BBR active with fq qdisc"
+                    if status.active
+                    else (
+                        "BBR not active: "
+                        f"qdisc={status.default_qdisc or 'unknown'}, "
+                        f"congestion_control={status.congestion_control or 'unknown'}"
+                    ),
+                )
+            )
+            checks.append(
+                Check(
+                    "OK" if bbr_config_path(paths).is_file() else "FAIL",
+                    f"BBR sysctl config: {bbr_config_path(paths)}",
+                )
+            )
+    else:
+        config_path = bbr_config_path(paths)
+        checks.append(
+            Check(
+                "WARN" if config_path.is_file() else "OK",
+                f"BBR disabled but managed config remains: {config_path}"
+                if config_path.is_file()
+                else "BBR management disabled",
+            )
+        )
 
     missing_secrets = [
         name for name in SECRET_NAMES if not secret_path(paths, name).is_file()

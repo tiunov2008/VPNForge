@@ -39,6 +39,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         "vpnforge.cli.hysteria_command.render",
         lambda *args: calls.append("hysteria-render"),
     )
+    monkeypatch.setattr("vpnforge.cli.bbr_command.apply", lambda: calls.append("bbr"))
     monkeypatch.setattr("vpnforge.cli.up_command.run", lambda *args: calls.append("up"))
     monkeypatch.setattr("vpnforge.cli.down_command.run", lambda: calls.append("down"))
     monkeypatch.setattr(
@@ -68,6 +69,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         ["cert", "issue"],
         ["xray", "render"],
         ["hysteria", "render"],
+        ["bbr", "apply"],
         ["up", "nginx"],
         ["up", "hysteria"],
         ["down"],
@@ -94,6 +96,7 @@ def test_cli_dispatches_all_public_commands(monkeypatch):
         "cert",
         "xray-render",
         "hysteria-render",
+        "bbr",
         "up",
         "up",
         "down",
@@ -142,3 +145,13 @@ def test_config_set_updates_hysteria_settings(path_environment):
     content = path_environment.env_file.read_text(encoding="utf-8")
     assert "ENABLE_HYSTERIA=false" in content
     assert "HYSTERIA_PORT_RANGE=21000-22000" in content
+
+
+def test_config_set_updates_bbr_setting(path_environment):
+    init_result = runner.invoke(app, ["init", "--domain", "example.com"])
+    assert init_result.exit_code == 0, init_result.output
+
+    result = runner.invoke(app, ["config", "set", "bbr-enabled", "true"])
+
+    assert result.exit_code == 0, result.output
+    assert "ENABLE_BBR=true" in path_environment.env_file.read_text(encoding="utf-8")

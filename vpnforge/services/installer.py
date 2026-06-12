@@ -11,6 +11,7 @@ from vpnforge.config import (
     write_settings,
 )
 from vpnforge.docker import DockerCompose
+from vpnforge.services.bbr import configure_bbr
 from vpnforge.services.certbot import issue_certificate
 from vpnforge.services.hysteria import render_hysteria
 from vpnforge.services.nginx import render_nginx, use_nginx
@@ -50,6 +51,7 @@ def install(
     settings_written = write_settings(paths, requested_settings, force=force)
     if not settings_written:
         settings = load_settings(paths)
+    configure_bbr(paths, settings.enable_bbr)
     generated = generate_secrets(paths, force=force)
     console.print(f"[green]Secrets ready[/green] ({len(generated)} generated)")
 
@@ -89,6 +91,7 @@ def install(
         installed=True,
         xray_enabled=settings.enable_xray,
         hysteria_enabled=settings.enable_hysteria,
+        bbr_enabled=settings.enable_bbr,
     )
 
     checks = run_doctor(paths)

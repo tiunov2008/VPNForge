@@ -33,7 +33,7 @@ esac
 
 echo "Installing VPNForge dependencies..."
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git python3 python3-venv
+DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git kmod procps python3 python3-venv
 
 if ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
     echo "VPNForge requires Python 3.10 or newer."

@@ -102,6 +102,10 @@ class Paths:
     def templates_dir(self) -> Path:
         return Path(__file__).resolve().parent / "templates"
 
+    @property
+    def sysctl_dir(self) -> Path:
+        return Path(os.getenv("VPNFORGE_SYSCTL_DIR", "/etc/sysctl.d"))
+
 
 @dataclass(frozen=True)
 class HysteriaPortRange:
@@ -139,6 +143,7 @@ class Settings:
     subscription_title: str = "VPNForge"
     enable_hysteria: bool = True
     hysteria_port_range: HysteriaPortRange = HysteriaPortRange()
+    enable_bbr: bool = False
 
     def as_env(self) -> str:
         return "\n".join(
@@ -153,6 +158,7 @@ class Settings:
                 f"SUBSCRIPTION_TITLE={format_env_value(self.subscription_title)}",
                 f"ENABLE_HYSTERIA={'true' if self.enable_hysteria else 'false'}",
                 f"HYSTERIA_PORT_RANGE={self.hysteria_port_range}",
+                f"ENABLE_BBR={'true' if self.enable_bbr else 'false'}",
                 "",
             ]
         )
@@ -227,6 +233,9 @@ def load_settings(paths: Paths) -> Settings:
         ),
         hysteria_port_range=HysteriaPortRange.parse(
             str(values.get("HYSTERIA_PORT_RANGE", "20000-50000"))
+        ),
+        enable_bbr=parse_bool_setting(
+            str(values.get("ENABLE_BBR", "false")), "ENABLE_BBR"
         ),
     )
 

@@ -12,6 +12,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "certificate_issued": False,
     "xray_enabled": True,
     "hysteria_enabled": True,
+    "bbr_enabled": False,
     "installed": False,
 }
 

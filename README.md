@@ -81,6 +81,21 @@ the service off, set `hysteria-enabled` to `false`, then run
 `vpnforge render --force`, `vpnforge nginx use final`, `vpnforge restart nginx`
 and `vpnforge up`.
 
+## TCP BBR
+
+BBR is disabled by default. Enable and apply it explicitly on a Linux host:
+
+```bash
+vpnforge config set bbr-enabled true
+vpnforge bbr apply
+vpnforge doctor
+```
+
+VPNForge writes `/etc/sysctl.d/99-vpnforge-bbr.conf` with `fq` and `bbr`.
+Setting `bbr-enabled` to `false` and running `vpnforge bbr apply` removes only
+that VPNForge-owned file without overriding the currently active kernel values.
+`vpnforge uninstall --purge` also removes this file.
+
 Change the subscription name sent in the `profile-title` header:
 
 ```bash

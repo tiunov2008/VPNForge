@@ -75,6 +75,8 @@ def test_rendered_configs_are_valid_and_complete(paths):
     )
     assert len(links) == 7
     assert all(link.startswith("vless://") for link in links[:6])
+    assert all("autoXRAY" not in link for link in links)
+    assert all("VPNForge" in link for link in links[:6])
     assert links[-1].startswith("hysteria2://")
     assert ":20000-50000/" in links[-1]
     assert "public-key" in links[0]

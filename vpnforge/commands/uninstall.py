@@ -7,6 +7,7 @@ from rich.console import Console
 
 from vpnforge.config import Paths
 from vpnforge.docker import DockerCompose
+from vpnforge.services.bbr import configure_bbr
 
 
 console = Console()
@@ -26,6 +27,7 @@ def run(purge: bool) -> None:
     _remove_tree(paths.runtime_dir)
     console.print(f"[green]Removed runtime data:[/green] {paths.runtime_dir}")
     if purge:
+        configure_bbr(paths, False)
         _remove_tree(paths.config_dir)
         console.print(
             f"[green]Removed settings and secrets:[/green] {paths.config_dir}"

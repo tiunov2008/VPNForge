@@ -4,6 +4,7 @@ from enum import Enum
 
 import typer
 
+from vpnforge.commands import bbr as bbr_command
 from vpnforge.commands import cert as cert_command
 from vpnforge.commands import config as config_command
 from vpnforge.commands import doctor as doctor_command
@@ -30,6 +31,7 @@ nginx_app = typer.Typer(help="Render and activate Nginx configs.")
 cert_app = typer.Typer(help="Manage Let's Encrypt certificates.")
 xray_app = typer.Typer(help="Manage Xray configuration.")
 hysteria_app = typer.Typer(help="Manage Hysteria 2 configuration.")
+bbr_app = typer.Typer(help="Manage Linux TCP BBR settings.")
 
 app.add_typer(config_app, name="config")
 app.add_typer(secrets_app, name="secrets")
@@ -37,6 +39,7 @@ app.add_typer(nginx_app, name="nginx")
 app.add_typer(cert_app, name="cert")
 app.add_typer(xray_app, name="xray")
 app.add_typer(hysteria_app, name="hysteria")
+app.add_typer(bbr_app, name="bbr")
 
 
 class Stage(str, Enum):
@@ -48,6 +51,7 @@ class ConfigKey(str, Enum):
     subscription_title = "subscription-title"
     hysteria_enabled = "hysteria-enabled"
     hysteria_port_range = "hysteria-port-range"
+    bbr_enabled = "bbr-enabled"
 
 
 @app.command("install")
@@ -112,6 +116,11 @@ def xray_render(force: bool = typer.Option(False, "--force")) -> None:
 @hysteria_app.command("render")
 def hysteria_render(force: bool = typer.Option(False, "--force")) -> None:
     execute(lambda: hysteria_command.render(force))
+
+
+@bbr_app.command("apply")
+def bbr_apply() -> None:
+    execute(bbr_command.apply)
 
 
 @app.command("up")
