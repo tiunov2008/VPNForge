@@ -40,11 +40,19 @@ def _generate_reality_keys(command_runner: Runner) -> tuple[str, str]:
         ["docker", "run", "--rm", XRAY_IMAGE, "x25519"],
         capture=True,
     )
-    private_match = re.search(r"(?im)^Private key:\s*(\S+)", result.stdout)
-    public_match = re.search(r"(?im)^(?:Public key|Password):\s*(\S+)", result.stdout)
-    if not private_match or not public_match:
+    parsed: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        label, separator, value = line.partition(":")
+        if not separator or not value.strip():
+            continue
+        normalized_label = re.sub(r"[^a-z]", "", label.lower())
+        if normalized_label == "privatekey":
+            parsed["private"] = value.strip()
+        elif normalized_label in {"publickey", "password", "passwordpublickey"}:
+            parsed["public"] = value.strip()
+    if "private" not in parsed or "public" not in parsed:
         raise RuntimeError("Could not parse Xray x25519 output")
-    return private_match.group(1), public_match.group(1)
+    return parsed["private"], parsed["public"]
 
 
 def generate_secrets(
