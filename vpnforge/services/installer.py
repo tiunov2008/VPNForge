@@ -13,6 +13,7 @@ from vpnforge.config import (
 from vpnforge.docker import DockerCompose
 from vpnforge.services.bbr import configure_bbr
 from vpnforge.services.certbot import issue_certificate
+from vpnforge.services.compose import render_compose
 from vpnforge.services.hysteria import render_hysteria
 from vpnforge.services.nginx import render_nginx, use_nginx
 from vpnforge.services.xray import generate_secrets, render_xray, template_context
@@ -27,7 +28,10 @@ def initialize(
 ) -> bool:
     ensure_directories(paths)
     settings = create_settings(domain, email)
-    return write_settings(paths, settings, force=force)
+    written = write_settings(paths, settings, force=force)
+    if written or not paths.compose_file.is_file():
+        render_compose(paths, force=force)
+    return written
 
 
 def install(
@@ -45,12 +49,13 @@ def install(
                 f"Existing settings use {existing.domain} / {existing.email}; rerun with --force to replace them"
             )
         settings = existing
-    assert_install_environment(paths, settings)
     console.rule("VPNForge initialization")
     ensure_directories(paths)
     settings_written = write_settings(paths, requested_settings, force=force)
     if not settings_written:
         settings = load_settings(paths)
+    render_compose(paths, force=True)
+    assert_install_environment(paths, settings)
     configure_bbr(paths, settings.enable_bbr)
     generated = generate_secrets(paths, force=force)
     console.print(f"[green]Secrets ready[/green] ({len(generated)} generated)")

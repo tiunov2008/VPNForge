@@ -1,0 +1,61 @@
+name: vpnforge
+
+networks:
+  vpnforge:
+    name: vpnforge
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: vpnforge-nginx
+    restart: unless-stopped
+    networks:
+      - vpnforge
+    ports:
+      - {{ nginx_port_mapping | tojson }}
+    volumes:
+      - {{ nginx_config_volume | tojson }}
+      - {{ nginx_html_volume | tojson }}
+      - {{ certbot_www_volume_ro | tojson }}
+      - {{ certbot_conf_volume_ro | tojson }}
+
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    container_name: vpnforge-xray
+    restart: unless-stopped
+    command: ["run", "-config", "/etc/xray/config.json"]
+    networks:
+      - vpnforge
+    ports:
+      - {{ xray_reality_port_mapping | tojson }}
+      - {{ xray_tls_port_mapping | tojson }}
+    volumes:
+      - {{ xray_config_volume | tojson }}
+      - {{ xray_cert_volume | tojson }}
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: vpnforge-certbot
+    networks:
+      - vpnforge
+    volumes:
+      - {{ certbot_www_volume | tojson }}
+      - {{ certbot_conf_volume | tojson }}
+
+  hysteria:
+    image: tobyxdd/hysteria:v2
+    container_name: vpnforge-hysteria
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      HYSTERIA_DISABLE_UPDATE_CHECK: "1"
+    command: ["server", "-c", "/etc/hysteria/config.yaml"]
+    volumes:
+      - {{ hysteria_config_volume | tojson }}
+      - {{ hysteria_cert_volume | tojson }}

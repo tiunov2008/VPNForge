@@ -4,16 +4,25 @@ import json
 import os
 import re
 import sys
-from dataclasses import dataclass
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from dotenv import dotenv_values
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
+from pydantic_settings import BaseSettings, DotEnvSettingsSource, SettingsConfigDict
+from pydantic_settings.sources.utils import parse_env_vars
 
 from vpnforge.files import atomic_write
 
 
-DOMAIN_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$")
-EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ENV_UNQUOTED_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 PORT_RANGE_RE = re.compile(r"^(\d{1,5})-(\d{1,5})$")
 
@@ -24,11 +33,49 @@ def format_env_value(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-@dataclass(frozen=True)
-class Paths:
+def _validate_domain_value(value: str) -> str:
+    domain = value.strip().lower()
+    if not domain:
+        raise ValueError("Invalid domain: empty")
+    labels = domain.split(".")
+    if len(labels) < 2:
+        raise ValueError(f"Invalid domain: {domain}")
+    if len(domain) > 253:
+        raise ValueError(f"Invalid domain: {domain}")
+    for label in labels:
+        if not label or len(label) > 63:
+            raise ValueError(f"Invalid domain: {domain}")
+        if label.startswith("-") or label.endswith("-"):
+            raise ValueError(f"Invalid domain: {domain}")
+        if not all(char.isascii() and (char.isalnum() or char == "-") for char in label):
+            raise ValueError(f"Invalid domain: {domain}")
+    tld = labels[-1]
+    if len(tld) < 2 or not all(char.isascii() and char.isalpha() for char in tld):
+        raise ValueError(f"Invalid domain: {domain}")
+    return domain
+
+
+class Paths(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     project_dir: Path
     config_dir: Path
     runtime_dir: Path
+
+    def __init__(
+        self,
+        project_dir: Path | str | None = None,
+        config_dir: Path | str | None = None,
+        runtime_dir: Path | str | None = None,
+        **data: Any,
+    ) -> None:
+        if project_dir is not None:
+            data["project_dir"] = project_dir
+        if config_dir is not None:
+            data["config_dir"] = config_dir
+        if runtime_dir is not None:
+            data["runtime_dir"] = runtime_dir
+        super().__init__(**data)
 
     @classmethod
     def from_env(cls) -> "Paths":
@@ -37,7 +84,7 @@ class Paths:
         installed_project = Path(sys.prefix) / "share" / "vpnforge"
         default_project = (
             source_project
-            if (source_project / "compose").is_dir()
+            if (source_project / "pyproject.toml").is_file()
             else installed_project
         )
         return cls(
@@ -75,6 +122,10 @@ class Paths:
         return self.generated_dir / "hysteria"
 
     @property
+    def compose_file(self) -> Path:
+        return self.generated_dir / "docker-compose.yml"
+
+    @property
     def certbot_dir(self) -> Path:
         return self.runtime_dir / "certbot"
 
@@ -107,16 +158,29 @@ class Paths:
         return Path(os.getenv("VPNFORGE_SYSCTL_DIR", "/etc/sysctl.d"))
 
 
-@dataclass(frozen=True)
-class HysteriaPortRange:
-    start: int = 20000
-    end: int = 50000
+class HysteriaPortRange(BaseModel):
+    model_config = ConfigDict(frozen=True)
 
-    def __post_init__(self) -> None:
-        if not 1 <= self.start <= 65535 or not 1 <= self.end <= 65535:
-            raise ValueError("Hysteria ports must be between 1 and 65535")
+    start: int = Field(default=20000, ge=1, le=65535)
+    end: int = Field(default=50000, ge=1, le=65535)
+
+    def __init__(
+        self,
+        start: int | None = None,
+        end: int | None = None,
+        **data: Any,
+    ) -> None:
+        if start is not None:
+            data["start"] = start
+        if end is not None:
+            data["end"] = end
+        super().__init__(**data)
+
+    @model_validator(mode="after")
+    def validate_order(self) -> "HysteriaPortRange":
         if self.start >= self.end:
             raise ValueError("Hysteria port range start must be less than end")
+        return self
 
     @classmethod
     def parse(cls, value: str) -> "HysteriaPortRange":
@@ -131,19 +195,37 @@ class HysteriaPortRange:
         return f"{self.start}-{self.end}"
 
 
-@dataclass(frozen=True)
-class Settings:
+class Settings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     domain: str
-    email: str
+    email: EmailStr
     enable_xray: bool = True
-    nginx_http_port: int = 80
-    xray_reality_port: int = 443
-    xray_tls_port: int = 8443
+    nginx_http_port: int = Field(default=80, ge=1, le=65535)
+    xray_reality_port: int = Field(default=443, ge=1, le=65535)
+    xray_tls_port: int = Field(default=8443, ge=1, le=65535)
     fingerprint: str = "firefox"
     subscription_title: str = "VPNForge"
     enable_hysteria: bool = True
-    hysteria_port_range: HysteriaPortRange = HysteriaPortRange()
+    hysteria_port_range: HysteriaPortRange = Field(
+        default_factory=HysteriaPortRange
+    )
     enable_bbr: bool = False
+
+    @field_validator("domain", mode="before")
+    @classmethod
+    def validate_domain_field(cls, value: Any) -> str:
+        return _validate_domain_value(str(value))
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value)
+
+    @field_validator("subscription_title", mode="before")
+    @classmethod
+    def validate_subscription_title_field(cls, value: Any) -> str:
+        return _validate_subscription_title_value(str(value))
 
     def as_env(self) -> str:
         return "\n".join(
@@ -164,22 +246,92 @@ class Settings:
         )
 
 
+class _LiteralDotEnvSettingsSource(DotEnvSettingsSource):
+    @staticmethod
+    def _static_read_env_file(
+        file_path: Path,
+        *,
+        encoding: str | None = None,
+        case_sensitive: bool = False,
+        ignore_empty: bool = False,
+        parse_none_str: str | None = None,
+    ) -> Mapping[str, str | None]:
+        file_vars = dotenv_values(
+            file_path,
+            encoding=encoding or "utf-8",
+            interpolate=False,
+        )
+        return parse_env_vars(file_vars, case_sensitive, ignore_empty, parse_none_str)
+
+
+class _EnvSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=True,
+    )
+
+    DOMAIN: str
+    EMAIL: EmailStr
+    ENABLE_XRAY: bool = True
+    NGINX_HTTP_PORT: int = Field(default=80, ge=1, le=65535)
+    XRAY_REALITY_PORT: int = Field(default=443, ge=1, le=65535)
+    XRAY_TLS_PORT: int = Field(default=8443, ge=1, le=65535)
+    FINGERPRINT: str = "firefox"
+    SUBSCRIPTION_TITLE: str = "VPNForge"
+    ENABLE_HYSTERIA: bool = True
+    HYSTERIA_PORT_RANGE: str = "20000-50000"
+    ENABLE_BBR: bool = False
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        literal_dotenv_settings = _LiteralDotEnvSettingsSource(
+            settings_cls,
+            env_file=dotenv_settings.env_file,
+            env_file_encoding=dotenv_settings.env_file_encoding,
+            case_sensitive=dotenv_settings.case_sensitive,
+            env_prefix=dotenv_settings.env_prefix,
+            env_nested_delimiter=dotenv_settings.env_nested_delimiter,
+            env_nested_max_split=dotenv_settings.env_nested_max_split,
+            env_ignore_empty=dotenv_settings.env_ignore_empty,
+            env_parse_none_str=dotenv_settings.env_parse_none_str,
+            env_parse_enums=dotenv_settings.env_parse_enums,
+        )
+        return (init_settings, literal_dotenv_settings)
+
+    def to_settings(self) -> Settings:
+        return Settings(
+            domain=self.DOMAIN,
+            email=str(self.EMAIL),
+            enable_xray=self.ENABLE_XRAY,
+            nginx_http_port=self.NGINX_HTTP_PORT,
+            xray_reality_port=self.XRAY_REALITY_PORT,
+            xray_tls_port=self.XRAY_TLS_PORT,
+            fingerprint=self.FINGERPRINT,
+            subscription_title=self.SUBSCRIPTION_TITLE,
+            enable_hysteria=self.ENABLE_HYSTERIA,
+            hysteria_port_range=HysteriaPortRange.parse(self.HYSTERIA_PORT_RANGE),
+            enable_bbr=self.ENABLE_BBR,
+        )
+
+
 def validate_domain(domain: str) -> str:
-    domain = domain.strip().lower()
-    if not DOMAIN_RE.fullmatch(domain):
-        raise ValueError(f"Invalid domain: {domain}")
-    return domain
+    return _validate_domain_value(domain)
 
 
 def create_settings(domain: str, email: str | None = None) -> Settings:
     domain = validate_domain(domain)
-    email = email or f"admin@{domain}"
-    if not EMAIL_RE.fullmatch(email):
-        raise ValueError(f"Invalid email: {email}")
-    return Settings(domain=domain, email=email)
+    return Settings(domain=domain, email=email or f"admin@{domain}")
 
 
-def validate_subscription_title(title: str) -> str:
+def _validate_subscription_title_value(title: str) -> str:
     title = title.strip()
     if not title:
         raise ValueError("Subscription title cannot be empty")
@@ -188,6 +340,10 @@ def validate_subscription_title(title: str) -> str:
     if len(title) > 128:
         raise ValueError("Subscription title cannot exceed 128 characters")
     return title
+
+
+def validate_subscription_title(title: str) -> str:
+    return _validate_subscription_title_value(title)
 
 
 def parse_bool_setting(value: str, name: str) -> bool:
@@ -208,36 +364,10 @@ def write_settings(paths: Paths, settings: Settings, *, force: bool = False) -> 
 def load_settings(paths: Paths) -> Settings:
     if not paths.env_file.is_file():
         raise FileNotFoundError(f"Settings file not found: {paths.env_file}")
-    values = dotenv_values(paths.env_file, interpolate=False)
-    domain = validate_domain(str(values.get("DOMAIN", "")))
-    email = str(values.get("EMAIL", ""))
-    if not email:
-        raise ValueError("EMAIL is missing from vpnforge.env")
-    if not EMAIL_RE.fullmatch(email):
-        raise ValueError(f"Invalid EMAIL in vpnforge.env: {email}")
-    return Settings(
-        domain=domain,
-        email=email,
-        enable_xray=parse_bool_setting(
-            str(values.get("ENABLE_XRAY", "true")), "ENABLE_XRAY"
-        ),
-        nginx_http_port=int(str(values.get("NGINX_HTTP_PORT", "80"))),
-        xray_reality_port=int(str(values.get("XRAY_REALITY_PORT", "443"))),
-        xray_tls_port=int(str(values.get("XRAY_TLS_PORT", "8443"))),
-        fingerprint=str(values.get("FINGERPRINT", "firefox")),
-        subscription_title=validate_subscription_title(
-            str(values.get("SUBSCRIPTION_TITLE", "VPNForge"))
-        ),
-        enable_hysteria=parse_bool_setting(
-            str(values.get("ENABLE_HYSTERIA", "true")), "ENABLE_HYSTERIA"
-        ),
-        hysteria_port_range=HysteriaPortRange.parse(
-            str(values.get("HYSTERIA_PORT_RANGE", "20000-50000"))
-        ),
-        enable_bbr=parse_bool_setting(
-            str(values.get("ENABLE_BBR", "false")), "ENABLE_BBR"
-        ),
-    )
+    try:
+        return _EnvSettings(_env_file=paths.env_file).to_settings()
+    except ValueError as error:
+        raise ValueError(f"Invalid settings file {paths.env_file}: {error}") from error
 
 
 def ensure_directories(paths: Paths) -> None:

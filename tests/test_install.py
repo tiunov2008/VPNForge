@@ -35,6 +35,11 @@ def test_full_install_workflow_order(monkeypatch, paths):
     )
     monkeypatch.setattr(
         installer,
+        "render_compose",
+        lambda *args, **kwargs: events.append("compose-render"),
+    )
+    monkeypatch.setattr(
+        installer,
         "generate_secrets",
         generate_secrets,
     )
@@ -98,6 +103,7 @@ def test_full_install_workflow_order(monkeypatch, paths):
     installer.install(paths, "example.com")
 
     assert events == [
+        "compose-render",
         "checks",
         "bbr-False",
         "secrets",

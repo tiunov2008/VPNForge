@@ -16,6 +16,7 @@ from vpnforge.config import (
     write_settings,
 )
 from vpnforge.docker import DockerCompose
+from vpnforge.services.compose import render_compose
 from vpnforge.services.certbot import sync_xray_certificate
 from vpnforge.services.hysteria import render_hysteria, sync_hysteria_certificate
 from vpnforge.services.nginx import render_nginx, use_nginx
@@ -73,6 +74,7 @@ def test_compose_nginx_xray_and_webroot(tmp_path: Path):
     render_xray(paths)
     sync_xray_certificate(paths, settings.domain)
     render_hysteria(paths)
+    render_compose(paths)
     sync_hysteria_certificate(paths, settings.domain)
     render_nginx(paths, "final")
     use_nginx(paths, "final")

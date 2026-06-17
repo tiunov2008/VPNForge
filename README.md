@@ -1,6 +1,6 @@
 # VPNForge
 
-VPNForge deploys Xray, Hysteria 2, Nginx and Certbot through a transparent Python CLI. Runtime configuration is generated from Jinja2 templates and stored outside the repository.
+VPNForge deploys Xray, Hysteria 2, Nginx and Certbot through a transparent Python CLI container. Runtime configuration and the Docker Compose file are generated from Jinja2 templates and stored outside the repository.
 
 ## Quick Install
 
@@ -10,7 +10,7 @@ Supported servers: Ubuntu and Debian.
 curl -fsSL https://raw.githubusercontent.com/tiunov2008/VPNForge/main/install.sh | sudo bash -s -- example.com
 ```
 
-The installer clones the project into `/opt/VPNForge`, creates a virtual environment and runs:
+The installer pulls `ghcr.io/tiunov2008/vpnforge:latest`, installs a small `/usr/local/bin/vpnforge` wrapper and runs:
 
 ```bash
 vpnforge install --domain example.com
@@ -21,6 +21,7 @@ vpnforge install --domain example.com
 - Settings: `/etc/vpnforge/vpnforge.env`
 - Secrets: `/etc/vpnforge/secrets/`
 - Generated configs: `/var/lib/vpnforge/generated/`
+- Generated Compose file: `/var/lib/vpnforge/generated/docker-compose.yml`
 - Certbot data: `/var/lib/vpnforge/certbot/`
 - State: `/var/lib/vpnforge/state.json`
 
@@ -53,14 +54,14 @@ vpnforge up
 vpnforge down
 vpnforge logs nginx --follow
 vpnforge logs xray
+vpnforge status
 vpnforge update
 vpnforge uninstall
 vpnforge uninstall --purge
 ```
 
-`vpnforge update` pulls `origin/main`, reinstalls the package in the current
-virtual environment and runs the updated installer. Existing settings and
-secrets are preserved.
+`vpnforge update` pulls the latest VPNForge image and runs a fresh CLI
+container against the existing settings and secrets.
 
 ## Hysteria 2
 

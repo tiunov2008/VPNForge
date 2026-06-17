@@ -103,7 +103,7 @@ def assert_install_environment(paths: Paths, settings=None) -> None:
     elif not compose_available():
         failures.append("Docker Compose plugin is unavailable")
     if not compose_files_exist(paths):
-        failures.append(f"Compose files are missing from {paths.compose_dir}")
+        failures.append(f"Generated compose file is missing: {paths.compose_file}")
     if settings is not None or paths.env_file.is_file():
         settings = settings or load_settings(paths)
         docker = DockerCompose(paths) if docker_available() else None
@@ -149,7 +149,10 @@ def run_doctor(paths: Paths) -> list[Check]:
         Check("OK" if compose_available() else "FAIL", "Docker Compose available")
     )
     checks.append(
-        Check("OK" if compose_files_exist(paths) else "FAIL", "Compose files available")
+        Check(
+            "OK" if compose_files_exist(paths) else "FAIL",
+            f"Generated compose file: {paths.compose_file}",
+        )
     )
     checks.append(
         Check(

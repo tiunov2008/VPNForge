@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from rich.console import Console
 
 from vpnforge.config import (
@@ -33,7 +31,7 @@ def set_value(key: str, value: str) -> None:
 
     write_settings(
         paths,
-        replace(settings, **changes),
+        settings.model_copy(update=changes),
         force=True,
     )
     console.print(f"[green]Updated {key}:[/green] {value.strip()}")

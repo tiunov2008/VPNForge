@@ -1,0 +1,15 @@
+.git
+.github
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+build
+dist
+*.egg-info
+letsencrypt
+letsencrypt-lib
+nginx
+xray

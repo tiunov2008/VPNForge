@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-from dataclasses import replace
 
 import pytest
 import yaml
@@ -33,9 +32,8 @@ VALUES = {
 
 def prepare(paths):
     ensure_directories(paths)
-    settings = replace(
-        create_settings("vpn.example.com", "admin@example.com"),
-        subscription_title="Моя подписка",
+    settings = create_settings("vpn.example.com", "admin@example.com").model_copy(
+        update={"subscription_title": "Моя подписка"}
     )
     write_settings(paths, settings)
     for name in SECRET_NAMES:
@@ -118,10 +116,11 @@ def test_disabling_hysteria_removes_generated_client_files(paths):
     prepare(paths)
     render_hysteria(paths)
     render_nginx(paths, "final")
-    settings = replace(
-        create_settings("vpn.example.com", "admin@example.com"),
-        subscription_title="Моя подписка",
-        enable_hysteria=False,
+    settings = create_settings("vpn.example.com", "admin@example.com").model_copy(
+        update={
+            "subscription_title": "Моя подписка",
+            "enable_hysteria": False,
+        }
     )
     write_settings(paths, settings, force=True)
 

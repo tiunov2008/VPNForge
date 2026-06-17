@@ -6,26 +6,21 @@ from vpnforge.config import Paths, Settings, load_settings
 from vpnforge.shell import CommandResult, Runner, runner
 
 
-COMPOSE_FILES = (
-    "compose.base.yml",
-    "compose.nginx.yml",
-    "compose.certbot.yml",
-    "compose.xray.yml",
-    "compose.hysteria.yml",
-)
-
-
 class DockerCompose:
     def __init__(self, paths: Paths, command_runner: Runner = runner):
         self.paths = paths
         self.runner = command_runner
 
     def command(self, *arguments: str) -> list[str]:
-        command = ["docker", "compose", "--project-name", "vpnforge"]
-        for filename in COMPOSE_FILES:
-            command.extend(["-f", str(self.paths.compose_dir / filename)])
-        command.extend(arguments)
-        return command
+        return [
+            "docker",
+            "compose",
+            "--project-name",
+            "vpnforge",
+            "-f",
+            str(self.paths.compose_file),
+            *arguments,
+        ]
 
     def environment(self, settings: Settings | None = None) -> dict[str, str]:
         if settings is None and self.paths.env_file.is_file():
@@ -53,7 +48,7 @@ class DockerCompose:
             self.command(*arguments),
             check=check,
             capture=capture,
-            cwd=self.paths.project_dir,
+            cwd=self.paths.generated_dir,
             env=self.environment(settings),
         )
 
@@ -134,4 +129,4 @@ class DockerCompose:
 
 
 def compose_files_exist(paths: Paths) -> bool:
-    return all((paths.compose_dir / filename).is_file() for filename in COMPOSE_FILES)
+    return paths.compose_file.is_file()

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from vpnforge.commands import restart
-from vpnforge.config import ensure_directories, write_settings
-from vpnforge.config import create_settings
+from vpnforge.config import Settings, create_settings, ensure_directories, write_settings
 
 
 def test_restart_hysteria_syncs_certificate(monkeypatch, path_environment):
@@ -32,3 +31,31 @@ def test_restart_hysteria_syncs_certificate(monkeypatch, path_environment):
     restart.run("hysteria")
 
     assert events == ["sync", ("restart", "hysteria")]
+
+
+def test_restart_without_service_restarts_enabled_services(monkeypatch, path_environment):
+    paths = path_environment
+    ensure_directories(paths)
+    write_settings(
+        paths,
+        Settings(
+            domain="vpn.example.com",
+            email="admin@vpn.example.com",
+            enable_xray=True,
+            enable_hysteria=False,
+        ),
+    )
+    events: list[object] = []
+
+    class FakeDocker:
+        def __init__(self, _paths):
+            pass
+
+        def restart(self, service):
+            events.append(("restart", service))
+
+    monkeypatch.setattr(restart, "DockerCompose", FakeDocker)
+
+    restart.run(None)
+
+    assert events == [("restart", "nginx"), ("restart", "xray")]

@@ -134,7 +134,7 @@ def down() -> None:
 
 
 @app.command("restart")
-def restart(service: str = typer.Argument(...)) -> None:
+def restart(service: str | None = typer.Argument(None)) -> None:
     execute(lambda: restart_command.run(service))
 
 
@@ -148,6 +148,11 @@ def logs(
 
 @app.command("doctor")
 def doctor() -> None:
+    execute(doctor_command.run)
+
+
+@app.command("status")
+def status() -> None:
     execute(doctor_command.run)
 
 

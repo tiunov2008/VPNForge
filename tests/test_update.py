@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sys
-
 import pytest
 
 from vpnforge.commands import update
@@ -18,7 +16,7 @@ class RecordingRunner:
         return CommandResult(0)
 
 
-def test_update_pulls_reinstalls_and_runs_fresh_cli(monkeypatch, tmp_path):
+def test_update_pulls_image_and_runs_fresh_cli_container(monkeypatch, tmp_path):
     paths = Paths(
         project_dir=tmp_path / "project",
         config_dir=tmp_path / "etc" / "vpnforge",
@@ -26,34 +24,23 @@ def test_update_pulls_reinstalls_and_runs_fresh_cli(monkeypatch, tmp_path):
     )
     ensure_directories(paths)
     write_settings(paths, create_settings("vpn.example.com", "admin@example.com"))
-    (paths.project_dir / ".git").mkdir(parents=True)
     monkeypatch.setattr(update.Paths, "from_env", classmethod(lambda cls: paths))
     monkeypatch.setattr(update, "is_root", lambda: True)
+    monkeypatch.setenv("VPNFORGE_IMAGE", "example/vpnforge:test")
     command_runner = RecordingRunner()
 
     update.run(command_runner)
 
-    assert command_runner.commands == [
-        [
-            "git",
-            "-C",
-            str(paths.project_dir),
-            "pull",
-            "--ff-only",
-            "origin",
-            "main",
-        ],
-        [sys.executable, "-m", "pip", "install", "-e", str(paths.project_dir)],
-        [
-            sys.executable,
-            "-m",
-            "vpnforge.cli",
-            "install",
-            "--domain",
-            "vpn.example.com",
-            "--email",
-            "admin@example.com",
-        ],
+    assert command_runner.commands[0] == ["docker", "pull", "example/vpnforge:test"]
+    fresh_cli = command_runner.commands[1]
+    assert fresh_cli[:3] == ["docker", "run", "--rm"]
+    assert "example/vpnforge:test" in fresh_cli
+    assert fresh_cli[-5:] == [
+        "install",
+        "--domain",
+        "vpn.example.com",
+        "--email",
+        "admin@example.com",
     ]
 
 
