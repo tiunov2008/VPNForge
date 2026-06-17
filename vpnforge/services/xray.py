@@ -199,6 +199,9 @@ def template_context(
     settings = settings or load_settings(paths)
     values = load_secrets(paths)
     links = client_links(settings, values)
+    subscription_links = [
+        item for item in links if not item["link"].startswith("hysteria2://")
+    ]
     encoded_title = base64.b64encode(
         settings.subscription_title.encode("utf-8")
     ).decode("ascii")
@@ -206,6 +209,7 @@ def template_context(
         "settings": settings,
         "secrets": values,
         "client_links": links,
+        "subscription_links": subscription_links,
         "subscription_url": f"https://{settings.domain}/{values['subscription_path']}.txt",
         "subscription_profile_title": f"base64:{encoded_title}",
         "hysteria_client_url": (
