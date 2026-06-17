@@ -16,6 +16,12 @@ The installer pulls `ghcr.io/tiunov2008/vpnforge:latest`, installs a small `/usr
 vpnforge install --domain example.com
 ```
 
+To replace existing settings during install, pass `--force`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tiunov2008/VPNForge/main/install.sh | sudo bash -s -- example.com --force
+```
+
 ## Storage
 
 - Settings: `/etc/vpnforge/vpnforge.env`
@@ -62,6 +68,9 @@ vpnforge uninstall --purge
 
 `vpnforge update` pulls the latest VPNForge image and runs a fresh CLI
 container against the existing settings and secrets.
+`vpnforge uninstall` stops/removes VPNForge containers before deleting runtime
+data. `vpnforge uninstall --purge` also removes settings, secrets, BBR managed
+sysctl config and the installed host wrapper when available.
 
 ## Hysteria 2
 

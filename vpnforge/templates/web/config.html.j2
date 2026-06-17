@@ -6,47 +6,259 @@
   <meta name="robots" content="noindex,nofollow">
   <title>VPNForge configs</title>
   <style>
-    body{font-family:monospace;background:#121212;color:#e0e0e0;padding:10px;max-width:900px;margin:0 auto}
-    h2{color:#c3e88d;border-top:2px solid #333;padding-top:20px;margin:15px 0 10px;font-size:18px}
-    .row{background:#1e1e1e;border:1px solid #333;border-radius:6px;padding:8px;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-    .label{background:#2c2c2c;color:#82aaff;padding:6px 10px;border-radius:4px;font-weight:700;font-size:13px;min-width:180px;text-align:center}
-    .code{flex:1;white-space:nowrap;overflow-x:auto;padding:8px;background:#121212;border-radius:4px;color:#c3e88d;font-size:12px}
-    button,a.btn{background:#333;color:#e0e0e0;border:1px solid #555;padding:7px 12px;border-radius:4px;cursor:pointer;font-weight:700;text-decoration:none}
-    button:hover,a.btn:hover{background:#c3e88d;color:#121212;border-color:#c3e88d}@media(max-width:600px){.label,.code{width:100%;min-width:100%}button,a.btn{flex:1}}
+    :root{
+      color-scheme:dark;
+      --bg:#0f1115;
+      --panel:#171b22;
+      --panel-2:#1d232d;
+      --text:#eef2f6;
+      --muted:#9aa7b5;
+      --line:#2b3441;
+      --blue:#6ea8fe;
+      --green:#67d39c;
+      --orange:#f5b86b;
+      --red:#ff7b7b;
+      --shadow:0 16px 44px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:var(--bg);
+      color:var(--text);
+      font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    }
+    button,a{font:inherit}
+    .shell{width:min(1160px,calc(100% - 32px));margin:0 auto;padding:28px 0 40px}
+    .topbar{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:18px;
+      margin-bottom:18px;
+    }
+    .brand{min-width:0}
+    .eyebrow{
+      margin:0 0 5px;
+      color:var(--green);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:0;
+      text-transform:uppercase;
+    }
+    h1{margin:0;font-size:30px;line-height:1.12;font-weight:780;letter-spacing:0}
+    .domain{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      max-width:100%;
+      color:var(--muted);
+      font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex:0 0 auto}
+    .summary{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+      margin-bottom:18px;
+    }
+    .metric{
+      border:1px solid var(--line);
+      background:var(--panel);
+      border-radius:8px;
+      padding:13px 14px;
+    }
+    .metric span{display:block;color:var(--muted);font-size:12px}
+    .metric strong{display:block;margin-top:2px;font-size:18px}
+    .section{margin-top:18px}
+    .section-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    h2{margin:0;font-size:16px;line-height:1.25}
+    .count{color:var(--muted);font-size:12px}
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+    }
+    .item{
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:var(--panel);
+      box-shadow:var(--shadow);
+      min-width:0;
+      overflow:hidden;
+    }
+    .item-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:13px 14px;
+      border-bottom:1px solid var(--line);
+      background:var(--panel-2);
+    }
+    .title{
+      display:flex;
+      align-items:center;
+      gap:9px;
+      min-width:0;
+      font-weight:760;
+    }
+    .mark{
+      width:9px;
+      height:9px;
+      border-radius:2px;
+      background:var(--blue);
+      flex:0 0 auto;
+    }
+    .mark.green{background:var(--green)}
+    .mark.orange{background:var(--orange)}
+    .mark.red{background:var(--red)}
+    .title span{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .actions{display:flex;gap:8px;flex:0 0 auto}
+    .btn{
+      border:1px solid var(--line);
+      border-radius:7px;
+      background:#242b36;
+      color:var(--text);
+      min-height:34px;
+      padding:7px 11px;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:7px;
+      white-space:nowrap;
+    }
+    .btn:hover{border-color:var(--blue);color:#fff}
+    .btn.primary{background:var(--blue);border-color:var(--blue);color:#07111f;font-weight:760}
+    .btn.ok{background:var(--green);border-color:var(--green);color:#07130d}
+    .code{
+      margin:0;
+      padding:14px;
+      min-height:54px;
+      color:#d6e4ff;
+      background:#10141b;
+      font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+      white-space:nowrap;
+      overflow:auto;
+      scrollbar-color:#3b4655 transparent;
+    }
+    .wide{grid-column:1/-1}
+    @media(max-width:760px){
+      .shell{width:min(100% - 20px,1160px);padding-top:18px}
+      .topbar{display:block}
+      .domain{margin-top:12px}
+      .summary,.grid{grid-template-columns:1fr}
+      h1{font-size:24px}
+      .item-head{align-items:flex-start;flex-direction:column}
+      .actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+      .btn{width:100%}
+    }
   </style>
 </head>
 <body>
-  <h2>TXT subscription</h2>
-  <div class="row">
-    <div class="label">Subscription</div>
-    <div class="code" id="subscription">{{ subscription_url|e }}</div>
-    <button type="button" data-copy="subscription">Copy</button>
-    <a class="btn" href="happ://add/{{ subscription_url|e }}">Add to HAPP</a>
-  </div>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <p class="eyebrow">VPNForge</p>
+        <h1>{{ settings.subscription_title|e }}</h1>
+      </div>
+      <div class="domain"><span class="dot"></span>{{ settings.domain|e }}</div>
+    </header>
+
+    <section class="summary" aria-label="Summary">
+      <div class="metric"><span>Subscription</span><strong>TXT</strong></div>
+      <div class="metric"><span>VPN configs</span><strong>{{ client_links|length }}</strong></div>
+      <div class="metric"><span>Hysteria 2</span><strong>{% if settings.enable_hysteria %}Enabled{% else %}Disabled{% endif %}</strong></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Subscription</h2>
+      </div>
+      <article class="item wide">
+        <div class="item-head">
+          <div class="title"><span class="mark green"></span><span>TXT subscription</span></div>
+          <div class="actions">
+            <button class="btn" type="button" data-copy="subscription">Copy</button>
+            <a class="btn primary" href="happ://add/{{ subscription_url|e }}">HAPP</a>
+          </div>
+        </div>
+        <pre class="code" id="subscription">{{ subscription_url|e }}</pre>
+      </article>
+    </section>
+
 {% if settings.enable_hysteria %}
-  <h2>Hysteria 2</h2>
-  <div class="row">
-    <div class="label">Client YAML</div>
-    <div class="code" id="hysteria-yaml">{{ hysteria_client_url|e }}</div>
-    <button type="button" data-copy="hysteria-yaml">Copy</button>
-    <a class="btn" href="{{ hysteria_client_url|e }}">Download</a>
-  </div>
+    <section class="section">
+      <div class="section-head">
+        <h2>Hysteria 2</h2>
+      </div>
+      <article class="item wide">
+        <div class="item-head">
+          <div class="title"><span class="mark orange"></span><span>Client YAML</span></div>
+          <div class="actions">
+            <button class="btn" type="button" data-copy="hysteria-yaml">Copy</button>
+            <a class="btn primary" href="{{ hysteria_client_url|e }}">Download</a>
+          </div>
+        </div>
+        <pre class="code" id="hysteria-yaml">{{ hysteria_client_url|e }}</pre>
+      </article>
+    </section>
 {% endif %}
-  <h2>Configs</h2>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Configs</h2>
+        <div class="count">{{ client_links|length }} items</div>
+      </div>
+      <div class="grid">
 {% for item in client_links %}
-  <div class="row">
-    <div class="label">{{ item.title|e }}</div>
-    <div class="code" id="config-{{ loop.index }}">{{ item.link|e }}</div>
-    <button type="button" data-copy="config-{{ loop.index }}">Copy</button>
-  </div>
+        <article class="item">
+          <div class="item-head">
+            <div class="title"><span class="mark{% if 'HYSTERIA' in item.title %} orange{% elif 'TLS' in item.title %} green{% endif %}"></span><span>{{ item.title|e }}</span></div>
+            <div class="actions">
+              <button class="btn" type="button" data-copy="config-{{ loop.index }}">Copy</button>
+            </div>
+          </div>
+          <pre class="code" id="config-{{ loop.index }}">{{ item.link|e }}</pre>
+        </article>
 {% endfor %}
+      </div>
+    </section>
+  </main>
   <script>
     document.addEventListener("click", async event => {
       const button = event.target.closest("button[data-copy]");
       if (!button) return;
-      await navigator.clipboard.writeText(document.getElementById(button.dataset.copy).textContent);
-      button.textContent = "OK";
-      setTimeout(() => { button.textContent = "Copy"; }, 1200);
+      const source = document.getElementById(button.dataset.copy);
+      if (!source) return;
+      const original = button.textContent;
+      try {
+        await navigator.clipboard.writeText(source.textContent.trim());
+        button.textContent = "OK";
+        button.classList.add("ok");
+      } catch (error) {
+        button.textContent = "Error";
+      }
+      setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove("ok");
+      }, 1200);
     });
   </script>
 </body>

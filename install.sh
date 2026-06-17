@@ -3,10 +3,36 @@
 set -euo pipefail
 
 IMAGE="${VPNFORGE_IMAGE:-ghcr.io/tiunov2008/vpnforge:latest}"
-DOMAIN="${1:-}"
+DOMAIN=""
+FORCE="false"
+
+for argument in "$@"; do
+    case "$argument" in
+        --force)
+            FORCE="true"
+            ;;
+        -h|--help)
+            echo "Usage: install.sh your-domain.com [--force]"
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $argument"
+            echo "Usage: install.sh your-domain.com [--force]"
+            exit 1
+            ;;
+        *)
+            if [ -n "$DOMAIN" ]; then
+                echo "Unexpected argument: $argument"
+                echo "Usage: install.sh your-domain.com [--force]"
+                exit 1
+            fi
+            DOMAIN="$argument"
+            ;;
+    esac
+done
 
 if [ -z "$DOMAIN" ]; then
-    echo "Usage: install.sh your-domain.com"
+    echo "Usage: install.sh your-domain.com [--force]"
     exit 1
 fi
 
@@ -49,13 +75,20 @@ exec docker run --rm -i \
     -e "VPNFORGE_CONFIG_DIR=/etc/vpnforge" \
     -e "VPNFORGE_RUNTIME_DIR=/var/lib/vpnforge" \
     -e "VPNFORGE_SYSCTL_DIR=/etc/sysctl.d" \
+    -e "VPNFORGE_HOST_BIN_DIR=/host/usr/local/bin" \
     -v /etc/vpnforge:/etc/vpnforge \
     -v /var/lib/vpnforge:/var/lib/vpnforge \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /etc/sysctl.d:/etc/sysctl.d \
+    -v /usr/local/bin:/host/usr/local/bin \
     -v /lib/modules:/lib/modules:ro \
     "$IMAGE" "$@"
 EOF
 chmod 0755 /usr/local/bin/vpnforge
 
-exec /usr/local/bin/vpnforge install --domain "$DOMAIN"
+INSTALL_ARGS=(install --domain "$DOMAIN")
+if [ "$FORCE" = "true" ]; then
+    INSTALL_ARGS+=(--force)
+fi
+
+exec /usr/local/bin/vpnforge "${INSTALL_ARGS[@]}"

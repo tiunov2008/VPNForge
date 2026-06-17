@@ -12,5 +12,8 @@ def test_install_script_installs_container_wrapper():
     assert "/var/run/docker.sock:/var/run/docker.sock" in content
     assert "/etc/vpnforge:/etc/vpnforge" in content
     assert "/var/lib/vpnforge:/var/lib/vpnforge" in content
+    assert "INSTALL_ARGS+=(--force)" in content
+    assert "/usr/local/bin:/host/usr/local/bin" in content
+    assert "VPNFORGE_HOST_BIN_DIR=/host/usr/local/bin" in content
     assert "git clone" not in content
     assert "python3 -m venv" not in content
