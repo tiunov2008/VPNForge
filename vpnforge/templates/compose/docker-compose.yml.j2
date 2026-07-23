@@ -6,7 +6,7 @@ networks:
 
 services:
   nginx:
-    image: nginx:alpine
+    image: nginx:stable-alpine3.24-perl
     container_name: vpnforge-nginx
     restart: unless-stopped
     networks:
