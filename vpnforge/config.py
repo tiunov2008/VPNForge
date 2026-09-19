@@ -122,6 +122,10 @@ class Paths(BaseModel):
         return self.generated_dir / "hysteria"
 
     @property
+    def warp_dir(self) -> Path:
+        return self.runtime_dir / "warp"
+
+    @property
     def compose_file(self) -> Path:
         return self.generated_dir / "docker-compose.yml"
 
@@ -156,6 +160,10 @@ class Paths(BaseModel):
     @property
     def sysctl_dir(self) -> Path:
         return Path(os.getenv("VPNFORGE_SYSCTL_DIR", "/etc/sysctl.d"))
+
+    @property
+    def cron_dir(self) -> Path:
+        return Path(os.getenv("VPNFORGE_CRON_DIR", "/etc/cron.d"))
 
 
 class HysteriaPortRange(BaseModel):
@@ -211,6 +219,7 @@ class Settings(BaseModel):
         default_factory=HysteriaPortRange
     )
     enable_bbr: bool = False
+    enable_warp: bool = False
 
     @field_validator("domain", mode="before")
     @classmethod
@@ -241,6 +250,7 @@ class Settings(BaseModel):
                 f"ENABLE_HYSTERIA={'true' if self.enable_hysteria else 'false'}",
                 f"HYSTERIA_PORT_RANGE={self.hysteria_port_range}",
                 f"ENABLE_BBR={'true' if self.enable_bbr else 'false'}",
+                f"ENABLE_WARP={'true' if self.enable_warp else 'false'}",
                 "",
             ]
         )
@@ -282,6 +292,7 @@ class _EnvSettings(BaseSettings):
     ENABLE_HYSTERIA: bool = True
     HYSTERIA_PORT_RANGE: str = "20000-50000"
     ENABLE_BBR: bool = False
+    ENABLE_WARP: bool = False
 
     @classmethod
     def settings_customise_sources(
@@ -319,6 +330,7 @@ class _EnvSettings(BaseSettings):
             enable_hysteria=self.ENABLE_HYSTERIA,
             hysteria_port_range=HysteriaPortRange.parse(self.HYSTERIA_PORT_RANGE),
             enable_bbr=self.ENABLE_BBR,
+            enable_warp=self.ENABLE_WARP,
         )
 
 
@@ -378,6 +390,7 @@ def ensure_directories(paths: Paths) -> None:
         paths.nginx_html_dir,
         paths.xray_dir,
         paths.hysteria_dir,
+        paths.warp_dir,
         paths.certbot_www_dir,
         paths.certbot_conf_dir,
         paths.logs_dir,

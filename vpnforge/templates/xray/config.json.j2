@@ -7,6 +7,13 @@
   },
   "dns": {
     "servers": [
+{% if settings.enable_warp %}
+      {
+        "address": "localhost",
+        "domains": ["full:warp"],
+        "skipFallback": true
+      },
+{% endif %}
       "https+local://8.8.4.4/dns-query",
       "https+local://8.8.8.8/dns-query",
       "https+local://1.1.1.1/dns-query",
@@ -233,5 +240,63 @@
       "tag": "block",
       "protocol": "blackhole"
     }
-  ]
+{% if settings.enable_warp %}
+    ,
+    {
+      "tag": "warp",
+      "protocol": "socks",
+      "settings": {
+        "servers": [
+          {
+            "address": "warp",
+            "port": 1080
+          }
+        ]
+      }
+    }
+{% endif %}
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "ip": ["geoip:private"],
+        "outboundTag": "block"
+      },
+      {
+        "domain": ["geosite:private"],
+        "outboundTag": "block"
+      },
+      {
+        "port": "25,135,137-139,445",
+        "outboundTag": "block"
+      },
+      {
+        "protocol": ["bittorrent"],
+        "outboundTag": "block"
+      },
+      {
+        "domain": [
+          "geosite:category-ads",
+          "geosite:win-spy"
+        ],
+        "outboundTag": "block"
+      }
+{% if settings.enable_warp %}
+      ,
+      {
+        "domain": [
+          "geosite:openai",
+          "geosite:google-gemini",
+          "geosite:canva",
+          "geosite:category-ip-geo-detect",
+          "ifconfig.me",
+          "checkip.amazonaws.com",
+          "2ip.io"
+        ],
+        "outboundTag": "warp"
+      }
+{% endif %}
+    ]
+  }
 }

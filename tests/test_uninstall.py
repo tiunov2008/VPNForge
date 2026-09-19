@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from vpnforge.commands import uninstall
+from vpnforge.services.certbot import configure_renewal, renewal_cron_path
 from vpnforge.shell import CommandResult
 
 
@@ -59,3 +60,17 @@ def test_purge_removes_host_wrapper_when_available(monkeypatch, paths, tmp_path)
     uninstall.run(purge=True, command_runner=RecordingRunner())
 
     assert not wrapper.exists()
+
+
+def test_uninstall_removes_the_renewal_job(monkeypatch, paths):
+    paths.runtime_dir.mkdir(parents=True)
+    paths.config_dir.mkdir(parents=True)
+    monkeypatch.setattr(uninstall.Paths, "from_env", classmethod(lambda cls: paths))
+    monkeypatch.setattr(uninstall, "configure_bbr", lambda *args: None)
+    cron_path = renewal_cron_path(paths)
+    configure_renewal(paths)
+    assert cron_path.is_file()
+
+    uninstall.run(purge=False, command_runner=RecordingRunner())
+
+    assert not cron_path.exists()

@@ -56,7 +56,11 @@ if ! docker compose version >/dev/null 2>&1; then
     exit 1
 fi
 
-mkdir -p /etc/vpnforge /var/lib/vpnforge/generated
+mkdir -p /etc/vpnforge /var/lib/vpnforge/generated /etc/cron.d
+
+if ! command -v cron >/dev/null 2>&1 && ! command -v crond >/dev/null 2>&1; then
+    echo "Warning: no cron daemon found; install cron or renew the certificate with 'vpnforge cert renew'."
+fi
 
 echo "Pulling VPNForge image: $IMAGE"
 docker pull "$IMAGE"
@@ -75,11 +79,13 @@ exec docker run --rm -i \
     -e "VPNFORGE_CONFIG_DIR=/etc/vpnforge" \
     -e "VPNFORGE_RUNTIME_DIR=/var/lib/vpnforge" \
     -e "VPNFORGE_SYSCTL_DIR=/etc/sysctl.d" \
+    -e "VPNFORGE_CRON_DIR=/etc/cron.d" \
     -e "VPNFORGE_HOST_BIN_DIR=/host/usr/local/bin" \
     -v /etc/vpnforge:/etc/vpnforge \
     -v /var/lib/vpnforge:/var/lib/vpnforge \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /etc/sysctl.d:/etc/sysctl.d \
+    -v /etc/cron.d:/etc/cron.d \
     -v /usr/local/bin:/host/usr/local/bin \
     -v /lib/modules:/lib/modules:ro \
     "$IMAGE" "$@"

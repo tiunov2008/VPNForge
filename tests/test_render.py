@@ -8,6 +8,7 @@ import yaml
 
 from vpnforge.config import create_settings, ensure_directories, write_settings
 from vpnforge.files import atomic_write
+from vpnforge.services.compose import render_compose
 from vpnforge.services.nginx import active_stage, render_nginx, use_nginx
 from vpnforge.services.hysteria import render_hysteria
 from vpnforge.services.xray import (
@@ -160,3 +161,62 @@ def test_hysteria_uri_percent_encodes_credentials():
 
     assert "password%20with%3A%2F%3F%23%40symbols" in uri
     assert "obfs%20with%3A%2F%3F%23%40symbols" in uri
+
+
+def test_xray_routing_blocks_private_networks_and_abuse_ports(paths):
+    prepare(paths)
+    render_xray(paths)
+
+    xray = json.loads((paths.xray_dir / "config.json").read_text(encoding="utf-8"))
+    routing = xray["routing"]
+    assert routing["domainStrategy"] == "IPIfNonMatch"
+    rules = routing["rules"]
+    assert {"ip": ["geoip:private"], "outboundTag": "block"} in rules
+    assert {"domain": ["geosite:private"], "outboundTag": "block"} in rules
+    assert {"port": "25,135,137-139,445", "outboundTag": "block"} in rules
+    assert {"protocol": ["bittorrent"], "outboundTag": "block"} in rules
+    assert any(
+        "geosite:category-ads" in rule.get("domain", []) for rule in rules
+    )
+    # Every rule has to reference an outbound that actually exists.
+    tags = {outbound["tag"] for outbound in xray["outbounds"]}
+    assert {rule["outboundTag"] for rule in rules} <= tags
+    assert "warp" not in tags
+
+
+def test_warp_adds_outbound_routing_and_compose_service(paths):
+    prepare(paths)
+    settings = create_settings("vpn.example.com", "admin@example.com").model_copy(
+        update={"subscription_title": "Моя подписка", "enable_warp": True}
+    )
+    write_settings(paths, settings, force=True)
+
+    render_xray(paths, force=True)
+    render_compose(paths, force=True)
+
+    xray = json.loads((paths.xray_dir / "config.json").read_text(encoding="utf-8"))
+    warp = next(item for item in xray["outbounds"] if item["tag"] == "warp")
+    assert warp["protocol"] == "socks"
+    assert warp["settings"]["servers"] == [{"address": "warp", "port": 1080}]
+    warp_rule = next(
+        rule for rule in xray["routing"]["rules"] if rule["outboundTag"] == "warp"
+    )
+    assert "geosite:openai" in warp_rule["domain"]
+    # The container name has to resolve through the Docker embedded DNS.
+    assert {
+        "address": "localhost",
+        "domains": ["full:warp"],
+        "skipFallback": True,
+    } in xray["dns"]["servers"]
+
+    compose = yaml.safe_load(paths.compose_file.read_text(encoding="utf-8"))
+    assert compose["services"]["warp"]["container_name"] == "vpnforge-warp"
+    assert "NET_ADMIN" in compose["services"]["warp"]["cap_add"]
+
+
+def test_warp_routing_is_absent_when_disabled(paths):
+    prepare(paths)
+    render_xray(paths)
+
+    content = (paths.xray_dir / "config.json").read_text(encoding="utf-8")
+    assert "warp" not in content

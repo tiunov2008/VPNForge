@@ -52,6 +52,7 @@ class ConfigKey(str, Enum):
     hysteria_enabled = "hysteria-enabled"
     hysteria_port_range = "hysteria-port-range"
     bbr_enabled = "bbr-enabled"
+    warp_enabled = "warp-enabled"
 
 
 @app.command("install")
@@ -106,6 +107,16 @@ def nginx_use(stage: Stage = typer.Argument(...)) -> None:
 @cert_app.command("issue")
 def cert_issue() -> None:
     execute(cert_command.issue)
+
+
+@cert_app.command("renew")
+def cert_renew(force: bool = typer.Option(False, "--force")) -> None:
+    execute(lambda: cert_command.renew(force))
+
+
+@cert_app.command("schedule")
+def cert_schedule(disable: bool = typer.Option(False, "--disable")) -> None:
+    execute(lambda: cert_command.schedule(disable))
 
 
 @xray_app.command("render")

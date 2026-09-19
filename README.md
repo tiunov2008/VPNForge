@@ -62,6 +62,8 @@ vpnforge logs nginx --follow
 vpnforge logs xray
 vpnforge status
 vpnforge update
+vpnforge cert renew
+vpnforge cert schedule
 vpnforge uninstall
 vpnforge uninstall --purge
 ```
@@ -69,8 +71,64 @@ vpnforge uninstall --purge
 `vpnforge update` pulls the latest VPNForge image and runs a fresh CLI
 container against the existing settings and secrets.
 `vpnforge uninstall` stops/removes VPNForge containers before deleting runtime
-data. `vpnforge uninstall --purge` also removes settings, secrets, BBR managed
-sysctl config and the installed host wrapper when available.
+data and the certificate renewal job. `vpnforge uninstall --purge` also removes
+settings, secrets, BBR managed sysctl config and the installed host wrapper when
+available.
+
+## Traffic Routing
+
+Xray applies a fixed rule set to everything a client sends:
+
+| Rule | Destination |
+| --- | --- |
+| `geoip:private`, `geosite:private` | blocked |
+| TCP/UDP ports 25, 135, 137-139, 445 | blocked |
+| BitTorrent | blocked |
+| `geosite:category-ads`, `geosite:win-spy` | blocked |
+
+Blocking private ranges keeps clients out of the Docker network, the host LAN
+and the cloud metadata endpoint. Blocking the mail and SMB ports keeps the
+server off spam blocklists. The rules rely on the geo databases shipped inside
+`ghcr.io/xtls/xray-core`, so no extra downloads are needed.
+
+## Certificate Renewal
+
+Let's Encrypt certificates live for 90 days and Xray and Hysteria 2 use their
+own copies, so a renewal has to be pushed to them. `vpnforge install` writes
+`/etc/cron.d/vpnforge-renew`, which runs `vpnforge cert renew` twice a day.
+
+```bash
+vpnforge cert renew           # renew now if the certificate is due
+vpnforge cert renew --force   # renew regardless of the remaining lifetime
+vpnforge cert schedule        # reinstall the cron job
+vpnforge cert schedule --disable
+```
+
+`cert renew` only copies certificates and restarts Nginx, Xray and Hysteria 2
+when Certbot actually issued a new certificate, so the scheduled runs are silent
+no-ops for most of the certificate's life. Nginx has to be running for the
+ACME challenge. `vpnforge doctor` reports the remaining lifetime and whether the
+renewal job is installed.
+
+## Cloudflare WARP
+
+Some services (OpenAI, Gemini, Canva, geolocation checks) block traffic coming
+from hosting IP ranges. With WARP enabled those domains leave the server through
+Cloudflare instead of the VPS address:
+
+```bash
+vpnforge config set warp-enabled true
+vpnforge render --force
+vpnforge up warp
+vpnforge restart xray
+```
+
+This starts a `vpnforge-warp` container that exposes a SOCKS5 proxy on the
+internal network only, and adds a `warp` outbound plus a routing rule for
+`geosite:openai`, `geosite:google-gemini`, `geosite:canva`,
+`geosite:category-ip-geo-detect` and a few IP-echo services. Everything else
+keeps going out directly. Set `warp-enabled` to `false` and re-render to remove
+the outbound and the container.
 
 ## Hysteria 2
 

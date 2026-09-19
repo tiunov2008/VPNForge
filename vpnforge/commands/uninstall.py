@@ -9,6 +9,7 @@ from rich.console import Console
 from vpnforge.config import Paths
 from vpnforge.docker import DockerCompose
 from vpnforge.services.bbr import configure_bbr
+from vpnforge.services.certbot import configure_renewal
 from vpnforge.shell import Runner, runner
 
 
@@ -18,6 +19,7 @@ CONTAINERS = (
     "vpnforge-xray",
     "vpnforge-certbot",
     "vpnforge-hysteria",
+    "vpnforge-warp",
 )
 NETWORKS = ("vpnforge",)
 
@@ -65,6 +67,8 @@ def run(purge: bool, command_runner: Runner = runner) -> None:
     paths = Paths.from_env()
     _stop_containers(paths, command_runner)
     console.print("[green]Stopped VPNForge containers.[/green]")
+    # The renewal job would only fail once the stack is gone.
+    configure_renewal(paths, False)
     _remove_tree(paths.runtime_dir)
     console.print(f"[green]Removed runtime data:[/green] {paths.runtime_dir}")
     if purge:

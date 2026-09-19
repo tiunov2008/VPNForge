@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from vpnforge.services import installer
+from vpnforge.services.certbot import renewal_cron_path
 from vpnforge.shell import CommandResult
 
 
@@ -114,6 +115,7 @@ def test_full_install_workflow_order(monkeypatch, paths):
         "recreate-nginx",
         "cert",
         "nginx-render-final",
+        "remove-warp",
         "validate-xray",
         "recreate-xray",
         "recreate-hysteria",
@@ -130,3 +132,4 @@ def test_full_install_workflow_order(monkeypatch, paths):
         "nginx": [True, True],
     }
     assert paths.env_file.is_file()
+    assert renewal_cron_path(paths).is_file()

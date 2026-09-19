@@ -12,7 +12,7 @@ from vpnforge.config import (
 )
 from vpnforge.docker import DockerCompose
 from vpnforge.services.bbr import configure_bbr
-from vpnforge.services.certbot import issue_certificate
+from vpnforge.services.certbot import configure_renewal, issue_certificate
 from vpnforge.services.compose import render_compose
 from vpnforge.services.hysteria import render_hysteria
 from vpnforge.services.nginx import render_nginx, use_nginx
@@ -70,8 +70,19 @@ def install(
     docker = DockerCompose(paths)
     docker.recreate("nginx")
     issue_certificate(paths, docker)
+    try:
+        cron_path = configure_renewal(paths)
+    except OSError as error:
+        # A host without /etc/cron.d mounted still installs; renewal is manual.
+        console.print(f"[yellow]Renewal schedule not installed:[/yellow] {error}")
+    else:
+        console.print(f"[green]Renewal scheduled twice a day:[/green] {cron_path}")
 
     render_nginx(paths, "final", force=True)
+    if settings.enable_warp:
+        docker.recreate("warp")
+    else:
+        docker.remove("warp")
     if settings.enable_xray:
         xray_validation = docker.validate_xray()
         if xray_validation.returncode != 0:
@@ -97,6 +108,7 @@ def install(
         xray_enabled=settings.enable_xray,
         hysteria_enabled=settings.enable_hysteria,
         bbr_enabled=settings.enable_bbr,
+        warp_enabled=settings.enable_warp,
     )
 
     checks = run_doctor(paths)

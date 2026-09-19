@@ -33,4 +33,8 @@ def test_up_removes_disabled_hysteria(monkeypatch, path_environment):
 
     up.run(None)
 
-    assert events == [("remove", "hysteria"), ("up", ["nginx"])]
+    assert events == [
+        ("remove", "hysteria"),
+        ("remove", "warp"),
+        ("up", ["nginx"]),
+    ]

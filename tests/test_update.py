@@ -35,6 +35,8 @@ def test_update_pulls_image_and_runs_fresh_cli_container(monkeypatch, tmp_path):
     fresh_cli = command_runner.commands[1]
     assert fresh_cli[:3] == ["docker", "run", "--rm"]
     assert "example/vpnforge:test" in fresh_cli
+    assert f"VPNFORGE_CRON_DIR={paths.cron_dir}" in fresh_cli
+    assert f"{paths.cron_dir}:{paths.cron_dir}" in fresh_cli
     assert fresh_cli[-5:] == [
         "install",
         "--domain",

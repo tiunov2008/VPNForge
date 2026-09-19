@@ -17,3 +17,11 @@ def test_install_script_installs_container_wrapper():
     assert "VPNFORGE_HOST_BIN_DIR=/host/usr/local/bin" in content
     assert "git clone" not in content
     assert "python3 -m venv" not in content
+
+
+def test_install_script_mounts_cron_directory_for_renewals():
+    root = Path(__file__).resolve().parents[1]
+    content = (root / "install.sh").read_text(encoding="utf-8")
+
+    assert "/etc/cron.d:/etc/cron.d" in content
+    assert "VPNFORGE_CRON_DIR=/etc/cron.d" in content

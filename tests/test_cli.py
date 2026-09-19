@@ -159,3 +159,30 @@ def test_config_set_updates_bbr_setting(path_environment):
 
     assert result.exit_code == 0, result.output
     assert "ENABLE_BBR=true" in path_environment.env_file.read_text(encoding="utf-8")
+
+
+def test_config_set_updates_warp_setting(path_environment):
+    init_result = runner.invoke(app, ["init", "--domain", "example.com"])
+    assert init_result.exit_code == 0, init_result.output
+
+    result = runner.invoke(app, ["config", "set", "warp-enabled", "true"])
+
+    assert result.exit_code == 0, result.output
+    assert "ENABLE_WARP=true" in path_environment.env_file.read_text(encoding="utf-8")
+
+
+def test_cert_renew_and_schedule_are_exposed(monkeypatch):
+    calls: list[object] = []
+    monkeypatch.setattr(
+        "vpnforge.cli.cert_command.renew", lambda force: calls.append(("renew", force))
+    )
+    monkeypatch.setattr(
+        "vpnforge.cli.cert_command.schedule",
+        lambda disable: calls.append(("schedule", disable)),
+    )
+
+    assert runner.invoke(app, ["cert", "renew"]).exit_code == 0
+    assert runner.invoke(app, ["cert", "renew", "--force"]).exit_code == 0
+    assert runner.invoke(app, ["cert", "schedule", "--disable"]).exit_code == 0
+
+    assert calls == [("renew", False), ("renew", True), ("schedule", True)]

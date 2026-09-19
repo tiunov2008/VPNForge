@@ -46,6 +46,25 @@ services:
       - {{ certbot_www_volume | tojson }}
       - {{ certbot_conf_volume | tojson }}
 
+  warp:
+    image: caomingjun/warp:latest
+    container_name: vpnforge-warp
+    restart: unless-stopped
+    networks:
+      - vpnforge
+    # runc 1.2.2 dropped tun/tap from the default device rules.
+    device_cgroup_rules:
+      - "c 10:200 rwm"
+    environment:
+      WARP_SLEEP: "2"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv4.conf.all.src_valid_mark: 1
+    volumes:
+      - {{ warp_data_volume | tojson }}
+
   hysteria:
     image: tobyxdd/hysteria:v2
     container_name: vpnforge-hysteria

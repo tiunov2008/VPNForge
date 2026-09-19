@@ -55,6 +55,10 @@ def template_context(paths: Paths) -> dict[str, object]:
             "/etc/hysteria/config.yaml",
             read_only=True,
         ),
+        "warp_data_volume": _volume(
+            paths.warp_dir,
+            "/var/lib/cloudflare-warp",
+        ),
         "hysteria_cert_volume": _volume(
             paths.hysteria_dir / "cert",
             "/etc/hysteria/cert",

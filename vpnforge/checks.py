@@ -14,7 +14,11 @@ from rich.console import Console
 from vpnforge.config import Paths, load_settings
 from vpnforge.docker import DockerCompose, compose_files_exist
 from vpnforge.services.bbr import bbr_config_path, bbr_status, is_linux
-from vpnforge.services.certbot import certificate_exists
+from vpnforge.services.certbot import (
+    certificate_days_remaining,
+    certificate_exists,
+    renewal_cron_path,
+)
 from vpnforge.services.hysteria import hysteria_certificate_path
 from vpnforge.services.nginx import active_stage
 from vpnforge.services.xray import SECRET_NAMES, secret_path
@@ -327,16 +331,19 @@ def run_doctor(paths: Paths) -> list[Check]:
         "nginx": False,
         "xray": False,
         "hysteria": False,
+        "warp": False,
     }
     if docker_available() and compose_available():
         docker = DockerCompose(paths)
         nginx_running = docker.is_running("nginx")
         xray_running = docker.is_running("xray")
         hysteria_running = docker.is_running("hysteria")
+        warp_running = docker.is_running("warp")
         running_services = {
             "nginx": nginx_running,
             "xray": xray_running,
             "hysteria": hysteria_running,
+            "warp": warp_running,
         }
         checks.append(
             Check("OK" if nginx_running else "FAIL", "Nginx container running")
@@ -355,6 +362,14 @@ def run_doctor(paths: Paths) -> list[Check]:
                 "Hysteria container running"
                 if settings.enable_hysteria
                 else "Hysteria container stopped (disabled)",
+            )
+        )
+        checks.append(
+            Check(
+                "OK" if warp_running == settings.enable_warp else "FAIL",
+                "WARP container running"
+                if settings.enable_warp
+                else "WARP container stopped (disabled)",
             )
         )
         if nginx_running:
@@ -450,5 +465,25 @@ def run_doctor(paths: Paths) -> list[Check]:
             "HTTP challenge path reachable",
         )
     )
-    checks.append(Check("WARN", "Certbot renew timer not configured"))
+    cron_path = renewal_cron_path(paths)
+    checks.append(
+        Check(
+            "OK" if cron_path.is_file() else "WARN",
+            f"Certificate renewal scheduled: {cron_path}"
+            if cron_path.is_file()
+            else f"Certificate renewal not scheduled: run 'vpnforge cert schedule' ({cron_path})",
+        )
+    )
+    days = certificate_days_remaining(paths, settings.domain)
+    if days is None:
+        checks.append(Check("WARN", "Certificate expiry could not be determined"))
+    else:
+        checks.append(
+            Check(
+                "OK" if days > 14 else "FAIL" if days <= 0 else "WARN",
+                f"Certificate expires in {days} days"
+                if days > 0
+                else "Certificate has expired",
+            )
+        )
     return checks

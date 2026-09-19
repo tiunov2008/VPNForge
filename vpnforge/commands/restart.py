@@ -8,6 +8,8 @@ from vpnforge.services.hysteria import sync_hysteria_certificate
 def _enabled_services(paths: Paths) -> list[str]:
     settings = load_settings(paths)
     services = ["nginx"]
+    if settings.enable_warp:
+        services.append("warp")
     if settings.enable_xray:
         services.append("xray")
     if settings.enable_hysteria:
@@ -25,6 +27,9 @@ def run(service: str | None) -> None:
 
     if service not in SERVICES:
         raise ValueError(f"Unknown service: {service}")
+    if service == "warp":
+        if not load_settings(paths).enable_warp:
+            raise RuntimeError("WARP is disabled in vpnforge.env")
     if service == "hysteria":
         settings = load_settings(paths)
         if not settings.enable_hysteria:

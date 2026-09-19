@@ -9,7 +9,7 @@ from vpnforge.services.hysteria import sync_hysteria_certificate
 
 
 console = Console()
-SERVICES = {"nginx", "xray", "hysteria"}
+SERVICES = {"nginx", "xray", "hysteria", "warp"}
 
 
 def run(service: str | None) -> None:
@@ -19,7 +19,11 @@ def run(service: str | None) -> None:
     settings = load_settings(paths)
     if service == "hysteria" and not settings.enable_hysteria:
         raise RuntimeError("Hysteria is disabled in vpnforge.env")
+    if service == "warp" and not settings.enable_warp:
+        raise RuntimeError("WARP is disabled in vpnforge.env")
     services = [service] if service else ["nginx"]
+    if not service and settings.enable_warp:
+        services.append("warp")
     if not service and settings.enable_xray:
         services.append("xray")
     if not service and settings.enable_hysteria:
@@ -51,5 +55,7 @@ def run(service: str | None) -> None:
     docker = DockerCompose(paths)
     if not settings.enable_hysteria:
         docker.remove("hysteria")
+    if not settings.enable_warp:
+        docker.remove("warp")
     docker.up(services)
     console.print(f"[green]Started:[/green] {', '.join(services)}")
