@@ -91,17 +91,63 @@ would rather not wait, redeploy once after the certificate appears.
 
 Renewals need no attention: the same loop runs continuously.
 
-## Deploy speed
+## Adding a node quickly, and updating it by pushing
 
-A deploy is a pull plus a container recreate — the image is built by CI, not on
-the server. Dokploy passes `--build` unconditionally, so keeping a `build:`
-section here would rebuild the image on every single deploy; that is why the
-services reference a published tag instead.
+The shape that makes both fast is **one Dokploy control server plus N VPN
+nodes as Remote Servers**. Dokploy is installed once, on the control server;
+the VPN nodes never run it.
 
-Consequence: a plain redeploy reuses the image already on the host. To take a
-new build of this branch, turn on **Pull latest images on deploy** in the
-service's settings, or pin `VPNFORGE_IMAGE` to a `dokploy-<sha>` tag and change
-it when you want to move.
+### Bare VM to working node
+
+1. **Control server, once.** Install Dokploy
+   (`curl -sSL https://dokploy.com/install.sh | sh`). It needs 2 GB RAM and
+   30 GB disk. This box only runs the UI and the deploy machinery, so it can be
+   small, and it does not have to be the VPN.
+2. **New VPN node: create the VM** and point the domain's A record at it.
+3. **Add it in Dokploy** under *Remote Servers* — paste the SSH key, then press
+   **Setup Server**. Dokploy installs Docker and Traefik over SSH; nothing has
+   to be prepared on the VM by hand.
+4. **Create the Compose service** on that server: this repository, branch
+   `dokploy`, Compose Path `./docker-compose.dokploy.yml`, then the Environment
+   tab, then the domain on `nginx` (port 80, HTTPS on).
+5. **Deploy.** The image is pulled, not built, so this is a pull plus a
+   container start.
+
+Steps 2–5 are per node; step 1 happens once for the whole fleet. The node never
+needs Dokploy itself — only Docker and Traefik, which step 3 installs.
+
+### Push to update every node
+
+Do **not** use Dokploy's git auto-deploy for this stack. It fires the moment
+the branch is pushed, which is before CI has published the image, so nodes
+would quietly redeploy the previous one.
+
+CI triggers the deployment instead, after the image exists. Wire it up once:
+
+1. In Dokploy: *Settings → Profile → API/CLI* → generate an API key.
+2. Open each Compose service and copy its `composeId` from the browser URL.
+3. Add three repository secrets on GitHub:
+   - `DOKPLOY_URL` — e.g. `https://panel.example.com`
+   - `DOKPLOY_API_KEY`
+   - `DOKPLOY_COMPOSE_IDS` — comma-separated, one per node
+4. On each service, enable **Pull latest images on deploy**. Without it Docker
+   keeps using the `:dokploy` image already on the host and the push changes
+   nothing.
+
+After that, a push to `dokploy` builds the image, publishes it, and deploys
+every node listed — in that order. The workflow step skips silently when the
+secrets are absent, so the image still publishes if you have not set this up.
+
+To move a single node independently, pin its `VPNFORGE_IMAGE` to a
+`dokploy-<sha>` tag instead and leave it out of `DOKPLOY_COMPOSE_IDS`.
+
+### Why not Dokploy on every VPN node
+
+It works, but it costs 2 GB of RAM and a multi-minute install per node for a
+control plane you already have elsewhere, and it gives no way to update the
+fleet from one push. If you want a single self-contained VPN box with no
+control plane at all, the host installer in the [README](../README.md) is
+faster still — one command, no Dokploy, and REALITY on 443.
 
 ## Running on more than one server
 

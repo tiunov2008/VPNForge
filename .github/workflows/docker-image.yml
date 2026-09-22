@@ -84,3 +84,37 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # Deployment is triggered here rather than by Dokploy's own git webhook:
+      # that fires the moment the branch is pushed, which is before the image
+      # above exists, so the nodes would quietly redeploy the previous one.
+      # Requires "Pull latest images on deploy" to be enabled on each service.
+      - name: Trigger Dokploy deployments
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_IDS: ${{ secrets.DOKPLOY_COMPOSE_IDS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOKPLOY_URL:-}" ] || [ -z "${DOKPLOY_API_KEY:-}" ] \
+             || [ -z "${DOKPLOY_COMPOSE_IDS:-}" ]; then
+            echo "Dokploy deploy secrets not set; image published, nothing triggered."
+            exit 0
+          fi
+          failed=0
+          for id in ${DOKPLOY_COMPOSE_IDS//,/ }; do
+            echo "::group::deploy $id"
+            status=$(curl -sS -o response.json -w '%{http_code}' -X POST \
+              -H "x-api-key: ${DOKPLOY_API_KEY:-}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"composeId\":\"${id}\",\"title\":\"CI ${GITHUB_SHA::7}\"}" \
+              "${DOKPLOY_URL%/}/api/compose.deploy") || status=000
+            cat response.json || true
+            echo
+            if [ "$status" != "200" ]; then
+              echo "::error::$id returned HTTP $status"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $failed
