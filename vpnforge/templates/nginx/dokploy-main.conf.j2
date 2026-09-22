@@ -1,0 +1,31 @@
+# Complete Nginx config for the Dokploy deployment.
+#
+# Dokploy wipes and re-clones the repository on every deploy, so nothing is
+# bind-mounted from the source tree: the whole config is rendered here into the
+# runtime volume and loaded with `nginx -c`.
+
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log notice;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 4096;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+    access_log /var/log/nginx/access.log main;
+
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+    server_tokens off;
+
+    include {{ active_config }};
+}

@@ -1,0 +1,41 @@
+# Traefik terminates TLS for https://{{ settings.domain }}/ and forwards plain
+# HTTP here, so this block carries no certificate of its own.
+server {
+    listen {{ nginx_http_port }};
+    server_name {{ settings.domain }};
+
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    set_real_ip_from 10.0.0.0/8;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+{% include "nginx/_site.conf.j2" %}
+}
+
+# Xray fallback targets. Reality and the TLS inbound hand unmatched connections
+# to these listeners over PROXY protocol, so they must present the real
+# certificate the cert sidecar writes into the shared volume.
+server {
+    server_name {{ settings.domain }};
+    listen 8080 ssl proxy_protocol;
+    listen 8081 proxy_protocol;
+    listen 8082 proxy_protocol;
+    http2 on;
+
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    set_real_ip_from 10.0.0.0/8;
+    real_ip_header proxy_protocol;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:VPNForgeSSL:10m;
+    ssl_session_tickets off;
+    ssl_certificate {{ tls_certificate }};
+    ssl_certificate_key {{ tls_certificate_key }};
+
+{% include "nginx/_site.conf.j2" %}
+}

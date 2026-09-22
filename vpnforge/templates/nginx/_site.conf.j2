@@ -1,0 +1,70 @@
+    root {{ site_root }};
+    index index.html;
+
+    grpc_read_timeout 1h;
+    grpc_send_timeout 1h;
+    grpc_set_header X-Real-IP $remote_addr;
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    location = /{{ secrets.subscription_path }}.txt {
+        types { }
+        default_type text/plain;
+        charset utf-8;
+        add_header profile-title "{{ subscription_profile_title }}" always;
+        add_header Cache-Control "no-store";
+        alias {{ site_root }}/subscription.txt;
+    }
+
+    location = /{{ secrets.subscription_path }}.html {
+        default_type text/html;
+        add_header Cache-Control "no-store";
+        alias {{ site_root }}/config.html;
+    }
+
+{% if settings.enable_hysteria %}
+    location = /{{ secrets.subscription_path }}.hysteria.yaml {
+        types { }
+        default_type application/yaml;
+        charset utf-8;
+        add_header Cache-Control "no-store";
+        alias {{ site_root }}/{{ secrets.subscription_path }}.hysteria.yaml;
+    }
+{% endif %}
+
+    location /{{ secrets.xhttp_path }}11 {
+        if ($request_method != "POST") {
+            return 404;
+        }
+
+        client_body_buffer_size 1m;
+        client_body_timeout 1h;
+        client_max_body_size 0;
+        set $xray_grpc xray:8411;
+        grpc_pass grpc://$xray_grpc;
+    }
+
+    location /{{ secrets.xhttp_path }} {
+        set $xray_http xray:8400;
+        proxy_pass http://$xray_http;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /config.html {
+        return 404;
+    }
+
+    location = /subscription.txt {
+        return 404;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }

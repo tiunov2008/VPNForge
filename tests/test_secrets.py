@@ -63,3 +63,54 @@ def test_secret_generation_parses_current_xray_output(paths):
     assert values["reality_public_key"] == (
         "anVToH_9tkrThuNFbim3buL2y_5ZBGdbMXLSkNy0oVU"
     )
+
+
+def test_local_reality_keypair_matches_xray_encoding(paths):
+    from base64 import urlsafe_b64decode
+
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from vpnforge.services.xray import generate_reality_keypair
+
+    private_key, public_key = generate_reality_keypair()
+
+    def decode(value: str) -> bytes:
+        assert "=" not in value
+        return urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+    private_raw = decode(private_key)
+    assert len(private_raw) == 32
+    assert len(decode(public_key)) == 32
+
+    derived = (
+        X25519PrivateKey.from_private_bytes(private_raw)
+        .public_key()
+        .public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+    assert decode(public_key) == derived
+
+
+def test_generate_secrets_can_use_local_reality_keys(paths):
+    ensure_directories(paths)
+    runner = FakeRunner()
+
+    generated = generate_secrets(
+        paths,
+        command_runner=runner,
+        reality_keys=lambda: ("local-private", "local-public"),
+    )
+
+    assert set(generated) == set(SECRET_NAMES)
+    assert runner.calls == 0
+    values = {
+        name: secret_path(paths, name).read_text(encoding="utf-8").strip()
+        for name in ("reality_private_key", "reality_public_key")
+    }
+    assert values == {
+        "reality_private_key": "local-private",
+        "reality_public_key": "local-public",
+    }

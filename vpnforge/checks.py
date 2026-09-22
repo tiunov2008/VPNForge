@@ -250,7 +250,7 @@ def run_doctor(paths: Paths) -> list[Check]:
     nginx_stage = active_stage(paths)
     checks.append(
         Check(
-            "OK" if nginx_stage in ("bootstrap", "final") else "FAIL",
+            "OK" if nginx_stage in ("bootstrap", "final", "dokploy") else "FAIL",
             f"Nginx active config: {nginx_stage or 'missing'}",
         )
     )

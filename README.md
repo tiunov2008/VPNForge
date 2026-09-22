@@ -2,6 +2,14 @@
 
 VPNForge deploys Xray, Hysteria 2, Nginx and Certbot through a transparent Python CLI container. Runtime configuration and the Docker Compose file are generated from Jinja2 templates and stored outside the repository.
 
+Two deployment paths exist, and a server should use only one:
+
+- **Dedicated server** - the host installer below. VPNForge owns ports 80 and
+  443, so REALITY runs on 443.
+- **Server already running [Dokploy](https://dokploy.com)** - deploy as a
+  Dokploy Compose service instead: [docs/DOKPLOY.md](docs/DOKPLOY.md). Traefik
+  keeps 80 and 443 and issues the certificate; VPNForge takes its own ports.
+
 ## Quick Install
 
 Supported servers: Ubuntu and Debian.
@@ -65,6 +73,11 @@ vpnforge update
 vpnforge uninstall
 vpnforge uninstall --purge
 ```
+
+Under Dokploy these container-driving commands are not used - Dokploy owns
+`docker compose`. That deployment adds `vpnforge dokploy bootstrap`,
+`vpnforge dokploy certs` and `vpnforge dokploy info`, which the stack runs for
+you; see [docs/DOKPLOY.md](docs/DOKPLOY.md).
 
 `vpnforge update` pulls the latest VPNForge image and runs a fresh CLI
 container against the existing settings and secrets.

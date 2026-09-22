@@ -7,6 +7,7 @@ import typer
 from vpnforge.commands import bbr as bbr_command
 from vpnforge.commands import cert as cert_command
 from vpnforge.commands import config as config_command
+from vpnforge.commands import dokploy as dokploy_command
 from vpnforge.commands import doctor as doctor_command
 from vpnforge.commands import down as down_command
 from vpnforge.commands import init as init_command
@@ -32,6 +33,7 @@ cert_app = typer.Typer(help="Manage Let's Encrypt certificates.")
 xray_app = typer.Typer(help="Manage Xray configuration.")
 hysteria_app = typer.Typer(help="Manage Hysteria 2 configuration.")
 bbr_app = typer.Typer(help="Manage Linux TCP BBR settings.")
+dokploy_app = typer.Typer(help="Run VPNForge as a Dokploy Compose stack.")
 
 app.add_typer(config_app, name="config")
 app.add_typer(secrets_app, name="secrets")
@@ -40,6 +42,7 @@ app.add_typer(cert_app, name="cert")
 app.add_typer(xray_app, name="xray")
 app.add_typer(hysteria_app, name="hysteria")
 app.add_typer(bbr_app, name="bbr")
+app.add_typer(dokploy_app, name="dokploy")
 
 
 class Stage(str, Enum):
@@ -121,6 +124,27 @@ def hysteria_render(force: bool = typer.Option(False, "--force")) -> None:
 @bbr_app.command("apply")
 def bbr_apply() -> None:
     execute(bbr_command.apply)
+
+
+@dokploy_app.command("bootstrap")
+def dokploy_bootstrap() -> None:
+    """Render settings, secrets and configs from environment variables."""
+    execute(dokploy_command.run_bootstrap)
+
+
+@dokploy_app.command("certs")
+def dokploy_certs(
+    watch: bool = typer.Option(False, "--watch"),
+    interval: float = typer.Option(60.0, "--interval"),
+) -> None:
+    """Import the Traefik certificate for this domain from acme.json."""
+    execute(lambda: dokploy_command.run_certs(watch, interval))
+
+
+@dokploy_app.command("info")
+def dokploy_info() -> None:
+    """Show the subscription endpoints and certificate status."""
+    execute(dokploy_command.run_info)
 
 
 @app.command("up")

@@ -126,6 +126,17 @@ class Paths(BaseModel):
         return self.generated_dir / "docker-compose.yml"
 
     @property
+    def tls_dir(self) -> Path:
+        """Shared certificate directory.
+
+        On Dokploy this is a volume the cert sidecar writes and Nginx, Xray and
+        Hysteria mount read-only, so it is overridable independently of the
+        runtime directory.
+        """
+        override = os.getenv("VPNFORGE_TLS_DIR")
+        return Path(override) if override else self.runtime_dir / "tls"
+
+    @property
     def certbot_dir(self) -> Path:
         return self.runtime_dir / "certbot"
 
@@ -320,6 +331,31 @@ class _EnvSettings(BaseSettings):
             hysteria_port_range=HysteriaPortRange.parse(self.HYSTERIA_PORT_RANGE),
             enable_bbr=self.ENABLE_BBR,
         )
+
+
+def settings_from_environment(
+    environ: Mapping[str, str] | None = None,
+) -> Settings:
+    """Build settings from process environment variables.
+
+    Dokploy injects configuration as environment variables rather than a host
+    file, so this is the counterpart of :func:`load_settings` for that path.
+    ``EMAIL`` stays optional and falls back to ``admin@<domain>``.
+    """
+    environ = os.environ if environ is None else environ
+    provided = {
+        name: environ[name]
+        for name in _EnvSettings.model_fields
+        if str(environ.get(name, "")).strip()
+    }
+    domain = provided.get("DOMAIN")
+    if not domain:
+        raise ValueError("DOMAIN environment variable is required")
+    provided.setdefault("EMAIL", f"admin@{validate_domain(domain)}")
+    try:
+        return _EnvSettings(_env_file=None, **provided).to_settings()
+    except ValueError as error:
+        raise ValueError(f"Invalid environment configuration: {error}") from error
 
 
 def validate_domain(domain: str) -> str:

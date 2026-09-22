@@ -9,6 +9,7 @@ description = "Transparent Xray, Nginx and Certbot deployment CLI"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "cryptography>=41,<47",
     "Jinja2>=3.1,<4",
     "pydantic[email]>=2.8,<3",
     "pydantic-settings>=2.4,<3",

@@ -6,8 +6,17 @@ import os
 import re
 import secrets as random_secrets
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import quote
+
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+    PublicFormat,
+)
 
 from vpnforge.config import Paths, Settings, load_settings
 from vpnforge.files import atomic_write
@@ -48,6 +57,24 @@ def secure_xray_runtime_path(path: Path, *, directory: bool = False) -> None:
         os.chown(path, XRAY_RUNTIME_UID, XRAY_RUNTIME_GID)
 
 
+def _b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def generate_reality_keypair() -> tuple[str, str]:
+    """Generate a REALITY X25519 keypair locally.
+
+    Produces the same base64url encoding as ``xray x25519`` without needing a
+    Docker socket, which the Dokploy init container does not have.
+    """
+    private_key = X25519PrivateKey.generate()
+    private_raw = private_key.private_bytes(
+        Encoding.Raw, PrivateFormat.Raw, NoEncryption()
+    )
+    public_raw = private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    return _b64url(private_raw), _b64url(public_raw)
+
+
 def _generate_reality_keys(command_runner: Runner) -> tuple[str, str]:
     result = command_runner.run(
         ["docker", "run", "--rm", XRAY_IMAGE, "x25519"],
@@ -69,7 +96,11 @@ def _generate_reality_keys(command_runner: Runner) -> tuple[str, str]:
 
 
 def generate_secrets(
-    paths: Paths, *, force: bool = False, command_runner: Runner = runner
+    paths: Paths,
+    *,
+    force: bool = False,
+    command_runner: Runner = runner,
+    reality_keys: Callable[[], tuple[str, str]] | None = None,
 ) -> list[str]:
     paths.secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(paths.secrets_dir, 0o700)
@@ -93,7 +124,10 @@ def generate_secrets(
     private_path = secret_path(paths, "reality_private_key")
     public_path = secret_path(paths, "reality_public_key")
     if force or not private_path.exists() or not public_path.exists():
-        private_key, public_key = _generate_reality_keys(command_runner)
+        if reality_keys is not None:
+            private_key, public_key = reality_keys()
+        else:
+            private_key, public_key = _generate_reality_keys(command_runner)
         _write_secret(private_path, private_key)
         _write_secret(public_path, public_key)
         generated.extend(["reality_private_key", "reality_public_key"])
