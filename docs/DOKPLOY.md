@@ -118,14 +118,15 @@ re-clones it on every deploy.
 
 ## Turning Hysteria on and off
 
-Two settings have to agree:
+`COMPOSE_PROFILES` is the only switch. Set it to `hysteria` to enable, clear it
+to disable, and redeploy.
 
-- `COMPOSE_PROFILES=hysteria` decides whether the container runs.
-- `ENABLE_HYSTERIA=true` decides whether the subscription advertises it.
-
-`init` refuses to start if they disagree, rather than handing clients an
-endpoint that answers nothing. To disable Hysteria, clear `COMPOSE_PROFILES`
-and set `ENABLE_HYSTERIA=false`.
+Compose uses it to decide whether the container is created at all, so `init`
+derives from the same value whether to render Hysteria and advertise it in the
+subscription. A second setting could disagree with it — which would either
+advertise an endpoint that answers nothing, or start a container with no
+config — so `ENABLE_HYSTERIA` is deliberately not forwarded in this
+deployment.
 
 ## Operations
 
@@ -161,9 +162,6 @@ depends on them.
   control of the host.
 
 ## Troubleshooting
-
-**`init` exits with "ENABLE_HYSTERIA is true but COMPOSE_PROFILES…"** — the two
-Hysteria settings disagree. See above.
 
 **`required variable DOMAIN is missing a value`** — `DOMAIN` is not set in the
 Environment tab.

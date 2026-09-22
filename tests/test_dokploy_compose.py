@@ -147,3 +147,11 @@ def test_nginx_reloads_so_it_picks_up_a_renewed_certificate(compose):
     # container starts. A '$$' escape would survive into the shell, where it
     # expands to the process ID instead.
     assert "$$" not in script
+
+
+def test_hysteria_has_a_single_switch(compose):
+    # Forwarding ENABLE_HYSTERIA as well would give the user two switches for
+    # one thing, which can disagree. COMPOSE_PROFILES alone decides.
+    init_env = compose["services"]["init"]["environment"]
+    assert "COMPOSE_PROFILES" in init_env
+    assert "ENABLE_HYSTERIA" not in init_env

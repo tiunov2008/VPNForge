@@ -7,7 +7,7 @@ import yaml
 
 from vpnforge.config import load_settings, settings_from_environment
 from vpnforge.dokploy import certs
-from vpnforge.dokploy.bootstrap import assert_profile_consistency, bootstrap
+from vpnforge.dokploy.bootstrap import apply_compose_profiles, bootstrap
 from vpnforge.services.nginx import active_stage
 from vpnforge.services.xray import load_secrets
 from vpnforge.state import load_state
@@ -139,41 +139,66 @@ def test_bootstrap_honours_port_and_title_overrides(paths):
 
 
 def test_bootstrap_without_hysteria(paths):
-    settings = bootstrap(
-        paths, {"DOMAIN": "vpn.example.com", "ENABLE_HYSTERIA": "false",
-                "COMPOSE_PROFILES": ""}
-    )
+    settings = bootstrap(paths, {"DOMAIN": "vpn.example.com", "COMPOSE_PROFILES": ""})
 
     assert settings.enable_hysteria is False
     assert not (paths.hysteria_dir / "config.yaml").exists()
+    # The TXT subscription never carries hysteria2:// links; the config page is
+    # where they are published, so that is what has to lose them.
     assert "hysteria2://" not in (
-        paths.nginx_html_dir / "subscription.txt"
+        paths.nginx_html_dir / "config.html"
+    ).read_text(encoding="utf-8")
+    assert not list(paths.nginx_html_dir.glob("*.hysteria.yaml"))
+
+
+def test_compose_profile_is_the_only_hysteria_switch(paths):
+    # An empty profile list wins over ENABLE_HYSTERIA: Compose would not create
+    # the container, so advertising Hysteria would hand clients a dead endpoint.
+    off = bootstrap(
+        paths,
+        {
+            "DOMAIN": "vpn.example.com",
+            "COMPOSE_PROFILES": "",
+            "ENABLE_HYSTERIA": "true",
+        },
+    )
+    assert off.enable_hysteria is False
+
+    # And an active profile wins the other way: the container would start with
+    # no rendered config and crash-loop.
+    on = bootstrap(
+        paths,
+        {
+            "DOMAIN": "vpn.example.com",
+            "COMPOSE_PROFILES": "hysteria",
+            "ENABLE_HYSTERIA": "false",
+        },
+    )
+    assert on.enable_hysteria is True
+    assert (paths.hysteria_dir / "config.yaml").is_file()
+    assert "hysteria2://" in (
+        paths.nginx_html_dir / "config.html"
     ).read_text(encoding="utf-8")
 
 
-def test_profile_mismatch_is_rejected_in_both_directions():
-    enabled = settings_from_environment({"DOMAIN": "vpn.example.com"})
-    with pytest.raises(RuntimeError, match="COMPOSE_PROFILES"):
-        assert_profile_consistency(enabled, {"COMPOSE_PROFILES": ""})
-
-    disabled = settings_from_environment(
-        {"DOMAIN": "vpn.example.com", "ENABLE_HYSTERIA": "false"}
-    )
-    with pytest.raises(RuntimeError, match="ENABLE_HYSTERIA"):
-        assert_profile_consistency(disabled, {"COMPOSE_PROFILES": "hysteria"})
-
-
-def test_profile_check_is_skipped_outside_compose():
+def test_profiles_are_ignored_outside_compose():
     settings = settings_from_environment({"DOMAIN": "vpn.example.com"})
 
     # No COMPOSE_PROFILES at all means the caller is not Dokploy.
-    assert_profile_consistency(settings, {})
+    assert apply_compose_profiles(settings, {}).enable_hysteria is True
 
 
-def test_profile_check_accepts_a_multi_profile_list():
-    settings = settings_from_environment({"DOMAIN": "vpn.example.com"})
+def test_profile_list_is_parsed_as_a_comma_separated_list():
+    settings = settings_from_environment(
+        {"DOMAIN": "vpn.example.com", "ENABLE_HYSTERIA": "false"}
+    )
 
-    assert_profile_consistency(settings, {"COMPOSE_PROFILES": "other, hysteria"})
+    updated = apply_compose_profiles(settings, {"COMPOSE_PROFILES": "other, hysteria"})
+
+    assert updated.enable_hysteria is True
+    assert apply_compose_profiles(
+        settings, {"COMPOSE_PROFILES": "other,unrelated"}
+    ).enable_hysteria is False
 
 
 def test_bootstrap_requires_a_domain(paths):

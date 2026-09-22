@@ -14,7 +14,6 @@ services:
       SUBSCRIPTION_TITLE: ${SUBSCRIPTION_TITLE:-VPNForge}
       FINGERPRINT: ${FINGERPRINT:-firefox}
       ENABLE_XRAY: ${ENABLE_XRAY:-true}
-      ENABLE_HYSTERIA: ${ENABLE_HYSTERIA:-true}
       HYSTERIA_PORT_RANGE: ${HYSTERIA_PORT_RANGE:-20000-32000}
       NGINX_HTTP_PORT: ${NGINX_HTTP_PORT:-80}
       XRAY_REALITY_PORT: ${XRAY_REALITY_PORT:-2053}
@@ -112,7 +111,9 @@ services:
         soft: 65535
         hard: 65535
 
-  # Opt-in via COMPOSE_PROFILES=hysteria.
+  # Opt-in via COMPOSE_PROFILES=hysteria, which is the single switch:
+  # init derives whether to render and advertise Hysteria from the same value,
+  # so the container and the subscription cannot disagree.
   # Host networking is required: publishing a UDP port range through Docker
   # spawns one docker-proxy per port and will not start. This service must
   # never be given a Dokploy Domain -- Dokploy would inject a networks: key and

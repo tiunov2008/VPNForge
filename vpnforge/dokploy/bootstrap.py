@@ -41,34 +41,25 @@ def _active_profiles(environ: Mapping[str, str]) -> set[str]:
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 
-def assert_profile_consistency(
+def apply_compose_profiles(
     settings: Settings, environ: Mapping[str, str]
-) -> None:
-    """Fail when ENABLE_HYSTERIA and COMPOSE_PROFILES disagree.
+) -> Settings:
+    """Let COMPOSE_PROFILES decide whether Hysteria is enabled.
 
-    Compose decides whether the Hysteria container runs, while ENABLE_HYSTERIA
-    decides whether the subscription advertises it. If they drift apart the
-    deployment still comes up, but hands clients an endpoint that answers
-    nothing -- so catch it here instead.
+    The profile is what actually determines whether Compose creates the
+    Hysteria container, so it also has to determine whether the subscription
+    advertises Hysteria -- otherwise clients get an endpoint that answers
+    nothing, or the container starts with no config and crash-loops. Deriving
+    one from the other leaves a single switch that cannot drift.
+
+    Outside Compose there is no COMPOSE_PROFILES, and the settings stand.
     """
     if "COMPOSE_PROFILES" not in environ:
-        return
-    enabled_by_profile = HYSTERIA_PROFILE in _active_profiles(environ)
-    if settings.enable_hysteria and not enabled_by_profile:
-        raise RuntimeError(
-            "ENABLE_HYSTERIA is true but COMPOSE_PROFILES does not contain "
-            f"'{HYSTERIA_PROFILE}', so the Hysteria container will not start "
-            "while the subscription still advertises it. Add "
-            f"COMPOSE_PROFILES={HYSTERIA_PROFILE} in the Dokploy Environment "
-            "tab, or set ENABLE_HYSTERIA=false."
-        )
-    if not settings.enable_hysteria and enabled_by_profile:
-        raise RuntimeError(
-            f"COMPOSE_PROFILES contains '{HYSTERIA_PROFILE}' but "
-            "ENABLE_HYSTERIA is false, so the Hysteria container would start "
-            "without a rendered config. Remove the profile, or set "
-            "ENABLE_HYSTERIA=true."
-        )
+        return settings
+    enabled = HYSTERIA_PROFILE in _active_profiles(environ)
+    if enabled == settings.enable_hysteria:
+        return settings
+    return settings.model_copy(update={"enable_hysteria": enabled})
 
 
 def bootstrap(
@@ -80,8 +71,12 @@ def bootstrap(
     console = console or Console()
     environ = os.environ if environ is None else environ
 
-    settings = settings_from_environment(environ)
-    assert_profile_consistency(settings, environ)
+    settings = apply_compose_profiles(settings_from_environment(environ), environ)
+    console.print(
+        "[green]Hysteria enabled[/green] (COMPOSE_PROFILES)"
+        if settings.enable_hysteria
+        else "[dim]Hysteria disabled (COMPOSE_PROFILES)[/dim]"
+    )
 
     ensure_directories(paths)
     # The Dokploy Environment tab is the single source of truth here, so the
