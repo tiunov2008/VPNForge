@@ -21,6 +21,9 @@ both on one server.
 
 ## Requirements
 
+Starting from a freshly created VM? Do [SERVER-SETUP.md](SERVER-SETUP.md)
+first — sizing, firewall, DNS and the Dokploy install — then come back here.
+
 - A Dokploy host (Traefik on 80/443, Dokploy UI on 3000).
 - A domain whose A record already points at the server. Traefik cannot issue a
   certificate before that resolves.

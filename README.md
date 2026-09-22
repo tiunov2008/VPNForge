@@ -9,6 +9,8 @@ Two deployment paths exist, and a server should use only one:
 - **Server already running [Dokploy](https://dokploy.com)** - deploy as a
   Dokploy Compose service instead: [docs/DOKPLOY.md](docs/DOKPLOY.md). Traefik
   keeps 80 and 443 and issues the certificate; VPNForge takes its own ports.
+  Starting from a bare VM, [docs/SERVER-SETUP.md](docs/SERVER-SETUP.md) covers
+  sizing, firewall and DNS first.
 
 ## Quick Install
 

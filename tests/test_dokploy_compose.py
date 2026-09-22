@@ -166,3 +166,20 @@ def test_vpnforge_services_pull_a_prebuilt_image(compose):
         assert "build" not in service, name
         assert service["image"].startswith("${VPNFORGE_IMAGE:-"), name
         assert ":dokploy}" in service["image"], name
+
+
+def test_setup_guide_firewall_ports_match_the_compose_defaults():
+    # The guide tells operators which ports to open. If a default moves here
+    # and the guide does not, the node silently refuses connections.
+    guide = (
+        Path(__file__).resolve().parents[1] / "docs" / "SERVER-SETUP.md"
+    ).read_text(encoding="utf-8")
+    spec = yaml.safe_load(COMPOSE_FILE.read_text(encoding="utf-8"))
+    env = spec["services"]["init"]["environment"]
+
+    for port in published_ports(spec["services"]["xray"]):
+        assert str(port) in guide, f"port {port} is not mentioned in SERVER-SETUP.md"
+
+    hop_range = env["HYSTERIA_PORT_RANGE"].split(":-")[-1].rstrip("}")
+    start, end = hop_range.split("-")
+    assert f"{start}:{end}/udp" in guide, "ufw rule for the hop range is stale"
