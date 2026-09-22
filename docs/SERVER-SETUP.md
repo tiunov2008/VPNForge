@@ -43,8 +43,8 @@ apt install -y ufw curl
 timedatectl set-ntp true      # ACME and TLS are sensitive to clock drift
 ```
 
-Create a non-root user with sudo and a key, and keep a second terminal open
-until you have confirmed you can still log in:
+Create a non-root user with sudo for your own access, and keep a second
+terminal open until you have confirmed you can still log in:
 
 ```bash
 adduser --disabled-password --gecos "" deploy
@@ -52,12 +52,15 @@ usermod -aG sudo deploy
 rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
 ```
 
-Then in `/etc/ssh/sshd_config` set `PermitRootLogin no` and
-`PasswordAuthentication no`, and `systemctl restart ssh`.
+Then in `/etc/ssh/sshd_config`, set `PasswordAuthentication no` and:
 
-Note: Dokploy connects to a VPN node over SSH **as root** by default, so if you
-disable root login you must give Dokploy a user with passwordless sudo, or keep
-root key-only access for its key alone.
+- **Control server:** `PermitRootLogin no`.
+- **VPN node:** `PermitRootLogin prohibit-password` — root by key only. Dokploy
+  connects to a managed server as `root` by default, so switching this to `no`
+  stops it from reaching the node at all. (The username is per-server and can
+  be changed to a sudo user, but root-by-key is the path Dokploy expects.)
+
+Then `systemctl restart ssh`.
 
 ## 3. Swap
 
@@ -129,9 +132,10 @@ while the A record looks perfectly correct.
 Turn off Cloudflare's proxy (grey cloud) for this record. Proxied traffic
 terminates at Cloudflare, which breaks REALITY and hides the real address.
 
-## 6. Install
+## 6. Control server: install Dokploy
 
-**Control server — install Dokploy:**
+Do this before preparing any VPN node — the node needs an SSH key that only
+exists once Dokploy is running.
 
 ```bash
 curl -sSL https://dokploy.com/install.sh | sh
@@ -140,12 +144,48 @@ curl -sSL https://dokploy.com/install.sh | sh
 Then open `http://<ip>:3000` and create the admin account immediately: the
 first account to register claims the instance.
 
-**VPN node — install nothing.** In Dokploy go to *Remote Servers*, add the
-server with its SSH key, and press **Setup Server**. Dokploy installs Docker
-and Traefik over SSH. Preinstalling Docker yourself is unnecessary and risks a
-version it does not expect.
+## 7. VPN node: give Dokploy its SSH key
 
-## 7. Optional: BBR
+This is a different key from the one you log in with. Dokploy holds its own
+pair and needs the public half installed on the node **before** you press
+*Setup Server* — that button is already an SSH connection, so it fails if the
+key is not there yet.
+
+**In Dokploy:** *Settings → SSH Keys → Create SSH Key*. Either let it generate
+a pair — ed25519 is the better choice — or paste one you already have. Copy the
+**public** key it shows. The private half never leaves Dokploy.
+
+**On the VPN node**, as root:
+
+```bash
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+cat >> /root/.ssh/authorized_keys <<'EOF'
+ssh-ed25519 AAAA... dokploy
+EOF
+chmod 600 /root/.ssh/authorized_keys
+```
+
+Paste the key on one line, exactly as Dokploy printed it. A line break inside
+it is the usual reason the connection fails afterwards.
+
+Then check on the node that it landed intact and that the daemon will accept
+it — a key Dokploy generated has no private half you can test with, so verify
+the target side instead:
+
+```bash
+wc -l /root/.ssh/authorized_keys                  # one line per key, no wrapping
+grep -E '^PermitRootLogin' /etc/ssh/sshd_config   # prohibit-password, not no
+sshd -t && echo "sshd config ok"
+```
+
+## 8. VPN node: hand it to Dokploy
+
+**Install nothing on the node.** In Dokploy go to *Remote Servers*, add the
+server with its IP and the SSH key from the previous step, and press
+**Setup Server**. Dokploy installs Docker and Traefik over SSH. Preinstalling
+Docker yourself is unnecessary and risks a version it does not expect.
+
+## 9. Optional: BBR
 
 The Dokploy deployment does not configure BBR — it would need a privileged
 container writing to the host's `/etc/sysctl.d`. On a VPN node it is usually
@@ -163,7 +203,7 @@ sysctl -n net.ipv4.tcp_congestion_control   # expect: bbr
 If that prints anything else, the kernel lacks BBR — any current Ubuntu or
 Debian kernel has it.
 
-## 8. Before deploying
+## 10. Before deploying
 
 On the VPN node:
 
@@ -183,8 +223,11 @@ service, set the environment, attach the domain to `nginx`, and deploy.
 **Dokploy installer exits with "something is already running on port 80"** —
 a web server is preinstalled. `systemctl disable --now nginx apache2` and rerun.
 
-**Setup Server fails to connect** — the key is not in the target's
-`authorized_keys`, or root login is disabled and no sudo user was configured.
+**Setup Server fails to connect** — in order of likelihood: the public key
+never made it into the node's `/root/.ssh/authorized_keys`; it was pasted
+across several lines instead of one; `PermitRootLogin` is `no` rather than
+`prohibit-password`; or `/root/.ssh` is not `700` and `authorized_keys` not
+`600`, which makes sshd ignore the file silently.
 
 **Certificate never issues** — the A record does not point here, a stale AAAA
 does, Cloudflare proxying is on, or port 80 is closed in the provider firewall.
