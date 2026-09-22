@@ -273,6 +273,27 @@ depends on them.
 **`required variable DOMAIN is missing a value`** — `DOMAIN` is not set in the
 Environment tab.
 
+**Bad Gateway, and nothing at all in the nginx log for port 80.** Traefik never
+reached nginx. Confirm with:
+
+```bash
+docker inspect <appName>-nginx-1   --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+```
+
+If that prints only `<appName>_default`, with no `dokploy-network`, and
+`.Config.Labels` contains no `traefik.*` entries, then no enabled Domain was
+pointing at the `nginx` service when the stack was last deployed. Either the
+domain was never added, or it was added and the stack was not redeployed
+afterwards — Dokploy writes the labels and the network into the compose file at
+deploy time, not when the domain is saved. Add the domain to service `nginx`,
+container port 80, then **Redeploy**.
+
+This blocks more than the website: Traefik only requests a certificate for a
+host it has a router for, so until the domain is attached the `certs` sidecar
+stays on the self-signed placeholder and the TLS-based VLESS links and Hysteria
+cannot work either. REALITY is the exception — it needs no certificate and
+works before this is fixed.
+
 **Certificate stays a placeholder.** Check `certs` logs. Usually the domain
 does not resolve to this host, HTTPS is off on the Dokploy domain, or the
 domain is attached to the wrong service. Confirm Traefik has it:
