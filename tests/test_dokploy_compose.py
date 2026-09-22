@@ -155,3 +155,10 @@ def test_hysteria_has_a_single_switch(compose):
     init_env = compose["services"]["init"]["environment"]
     assert "COMPOSE_PROFILES" in init_env
     assert "ENABLE_HYSTERIA" not in init_env
+
+
+def test_images_are_built_without_the_host_only_tooling(compose):
+    # The Docker CLI, Compose plugin, kmod and procps exist for the host
+    # installer, which drives docker compose over a socket. Nothing here does.
+    for name in ("init", "certs"):
+        assert compose["services"][name]["build"]["target"] == "runtime", name

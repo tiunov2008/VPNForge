@@ -6,6 +6,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Skips the Docker CLI, Compose plugin, kmod and procps that only the
+      # host installer needs; this path has no Docker socket.
+      target: runtime
     command: ["dokploy", "bootstrap"]
     restart: "no"
     environment:
@@ -38,6 +41,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Skips the Docker CLI, Compose plugin, kmod and procps that only the
+      # host installer needs; this path has no Docker socket.
+      target: runtime
     command:
       ["dokploy", "certs", "--watch", "--interval", "${CERT_POLL_INTERVAL:-60}"]
     restart: unless-stopped
