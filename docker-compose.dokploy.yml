@@ -3,12 +3,10 @@ services:
   # configs and generates the secrets, both into named volumes so they survive
   # the repository being re-cloned on every deploy.
   init:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      # Skips the Docker CLI, Compose plugin, kmod and procps that only the
-      # host installer needs; this path has no Docker socket.
-      target: runtime
+    # Pulled, not built. Dokploy passes --build on every deploy, so a build:
+    # section here would rebuild the image each time; this keeps a deploy to
+    # pull + up. Point VPNFORGE_IMAGE at your own tag to override.
+    image: ${VPNFORGE_IMAGE:-ghcr.io/tiunov2008/vpnforge:dokploy}
     command: ["dokploy", "bootstrap"]
     restart: "no"
     environment:
@@ -38,12 +36,10 @@ services:
   # Copies the certificate Traefik obtained for this domain out of acme.json
   # into the shared volume that nginx, xray and hysteria read.
   certs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      # Skips the Docker CLI, Compose plugin, kmod and procps that only the
-      # host installer needs; this path has no Docker socket.
-      target: runtime
+    # Pulled, not built. Dokploy passes --build on every deploy, so a build:
+    # section here would rebuild the image each time; this keeps a deploy to
+    # pull + up. Point VPNFORGE_IMAGE at your own tag to override.
+    image: ${VPNFORGE_IMAGE:-ghcr.io/tiunov2008/vpnforge:dokploy}
     command:
       ["dokploy", "certs", "--watch", "--interval", "${CERT_POLL_INTERVAL:-60}"]
     restart: unless-stopped

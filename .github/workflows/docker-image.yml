@@ -2,7 +2,7 @@ name: Docker image
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dokploy"]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -11,7 +11,10 @@ permissions:
   packages: write
 
 jobs:
+  # Host installer image: the default target, which carries the Docker CLI and
+  # the Compose plugin.
   publish:
+    if: github.ref != 'refs/heads/dokploy'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -41,6 +44,43 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # Dokploy image: the slim runtime target. Publishing it is what lets the
+  # Dokploy stack pull instead of building on the server at every deploy.
+  publish-dokploy:
+    if: github.ref == 'refs/heads/dokploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/tiunov2008/vpnforge
+          tags: |
+            type=raw,value=dokploy
+            type=sha,prefix=dokploy-
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

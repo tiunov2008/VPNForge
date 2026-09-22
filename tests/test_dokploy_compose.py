@@ -157,8 +157,12 @@ def test_hysteria_has_a_single_switch(compose):
     assert "ENABLE_HYSTERIA" not in init_env
 
 
-def test_images_are_built_without_the_host_only_tooling(compose):
-    # The Docker CLI, Compose plugin, kmod and procps exist for the host
-    # installer, which drives docker compose over a socket. Nothing here does.
+def test_vpnforge_services_pull_a_prebuilt_image(compose):
+    # Dokploy passes --build unconditionally, so a build: section would rebuild
+    # the image on the server at every deploy. The published tag is the slim
+    # runtime target, without the Docker CLI the host installer needs.
     for name in ("init", "certs"):
-        assert compose["services"][name]["build"]["target"] == "runtime", name
+        service = compose["services"][name]
+        assert "build" not in service, name
+        assert service["image"].startswith("${VPNFORGE_IMAGE:-"), name
+        assert ":dokploy}" in service["image"], name

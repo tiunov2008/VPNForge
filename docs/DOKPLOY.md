@@ -59,7 +59,15 @@ and Compose rejects that combination.
 **5. Open the firewall** for `XRAY_REALITY_PORT/tcp`, `XRAY_TLS_PORT/tcp` and
 `HYSTERIA_PORT_RANGE/udp`, in both the provider firewall and UFW.
 
-**6. Deploy.** Then read the `init` container's log — it prints the
+**6. Make the image pullable.** The stack pulls
+`ghcr.io/tiunov2008/vpnforge:dokploy`, published by CI from this branch. GHCR
+packages start **private even for a public repository**, so either make the
+package public once (GitHub → Packages → vpnforge → Package settings →
+Change visibility), or add a registry credential in Dokploy under
+*Settings → Registry*. To build it yourself instead, set `VPNFORGE_IMAGE` to
+your own tag.
+
+**7. Deploy.** Then read the `init` container's log — it prints the
 subscription URL. `https://<domain>/<random>.html` is the config page.
 
 ## First deploy takes a few minutes to settle
@@ -82,6 +90,48 @@ certificate. VLESS-over-TLS and Hysteria are the ones that need step 5. If you
 would rather not wait, redeploy once after the certificate appears.
 
 Renewals need no attention: the same loop runs continuously.
+
+## Deploy speed
+
+A deploy is a pull plus a container recreate — the image is built by CI, not on
+the server. Dokploy passes `--build` unconditionally, so keeping a `build:`
+section here would rebuild the image on every single deploy; that is why the
+services reference a published tag instead.
+
+Consequence: a plain redeploy reuses the image already on the host. To take a
+new build of this branch, turn on **Pull latest images on deploy** in the
+service's settings, or pin `VPNFORGE_IMAGE` to a `dokploy-<sha>` tag and change
+it when you want to move.
+
+## Running on more than one server
+
+Dokploy offers two ways to involve additional servers, and only one of them
+works for this stack.
+
+**Remote Servers** (SSH) is the right one. Dokploy installs only Traefik on the
+remote host, so the port layout and the certificate flow are identical to a
+local deploy and this compose file works unchanged. Each server keeps its own
+volumes, its own `acme.json` and its own Traefik, which is exactly what this
+design assumes. The servers show up in the Dokploy UI.
+
+**Cluster / Swarm worker nodes** does not work here, for reasons that are
+structural rather than cosmetic:
+
+- A Compose service of type `docker-compose` is a plain `docker compose up` on
+  the Dokploy host. It is never scheduled onto workers at all.
+- Switching to type `stack` to reach the workers means `docker stack deploy`,
+  which **ignores `depends_on` conditions**. The whole stack is ordered around
+  `init` finishing before anything else starts, and Swarm has no run-once-then-
+  start-the-rest primitive.
+- Named volumes in Swarm are node-local. `vpnforge-config`, `vpnforge-runtime`
+  and `vpnforge-tls` are shared by every service by design; once services land
+  on different nodes they see different empty volumes.
+- The certificate sidecar reads Traefik's `acme.json`, which lives on the
+  manager. A worker has no copy of it.
+- Swarm also drops `build:` and `network_mode`, and Cluster additionally
+  requires a container registry.
+
+Use one VPNForge stack per server, added through Remote Servers.
 
 ## Ports
 
