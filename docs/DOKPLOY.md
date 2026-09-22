@@ -134,10 +134,18 @@ Everything runs through the Dokploy UI — the `vpnforge up`/`down`/`restart`
 commands belong to the host install and are not used here. Dokploy owns
 `docker compose`.
 
+The subscription URL is printed by `init` on every deploy — read it in the
+Dokploy UI under the service's Logs, or from a shell on the host:
+
 ```bash
-# from a shell on the Dokploy host
-docker compose -p <appName> exec certs vpnforge dokploy info   # endpoints + cert status
-docker compose -p <appName> logs init                          # what the last deploy rendered
+# find the containers (appName carries a random suffix Dokploy assigns)
+docker ps --format '{{.Names}}' | grep -E 'certs|init'
+
+# endpoints and certificate status
+docker exec <certs-container> vpnforge dokploy info
+
+# what the last deploy rendered
+docker logs <init-container>
 ```
 
 Changing a setting means editing the Environment tab and redeploying: `init`
