@@ -7,6 +7,7 @@ import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 import yaml
 from rich.console import Console
@@ -14,10 +15,11 @@ from rich.console import Console
 from vpnforge.config import Paths, load_settings
 from vpnforge.docker import DockerCompose, compose_files_exist
 from vpnforge.services.bbr import bbr_config_path, bbr_status, is_linux
-from vpnforge.services.certbot import certificate_exists
+from vpnforge.services.certbot import certificate_exists, certificate_expiry
 from vpnforge.services.hysteria import hysteria_certificate_path
 from vpnforge.services.nginx import active_stage
 from vpnforge.services.xray import SECRET_NAMES, secret_path
+from vpnforge.state import load_state
 from vpnforge.shell import runner
 
 
@@ -450,5 +452,51 @@ def run_doctor(paths: Paths) -> list[Check]:
             "HTTP challenge path reachable",
         )
     )
-    checks.append(Check("WARN", "Certbot renew timer not configured"))
+    checks.extend(certificate_renewal_checks(paths, settings.domain))
+    return checks
+
+
+RENEW_TIMER = "vpnforge-cert-renew.timer"
+
+
+def certificate_renewal_checks(
+    paths: Paths, domain: str, now: datetime | None = None
+) -> list[Check]:
+    now = now or datetime.now(timezone.utc)
+    checks: list[Check] = []
+    expiry = certificate_expiry(paths, domain)
+    if expiry is not None:
+        days_left = (expiry - now).days
+        if expiry <= now:
+            checks.append(Check("FAIL", f"Certificate expired on {expiry:%Y-%m-%d}"))
+        elif days_left < 14:
+            checks.append(
+                Check("WARN", f"Certificate expires in {days_left} days ({expiry:%Y-%m-%d})")
+            )
+        else:
+            checks.append(
+                Check("OK", f"Certificate valid for {days_left} days ({expiry:%Y-%m-%d})")
+            )
+
+    last_run = load_state(paths).get("certificate_renew_checked_at")
+    try:
+        last_run_at = datetime.fromisoformat(last_run) if last_run else None
+    except (TypeError, ValueError):
+        last_run_at = None
+    if last_run_at is not None and now - last_run_at <= timedelta(days=2):
+        checks.append(Check("OK", f"Certificate auto-renew last ran {last_run}"))
+    elif last_run_at is not None:
+        checks.append(
+            Check(
+                "WARN",
+                f"Certificate auto-renew has not run since {last_run}; check systemctl status {RENEW_TIMER}",
+            )
+        )
+    else:
+        checks.append(
+            Check(
+                "WARN",
+                f"Certificate auto-renew has not run yet; rerun install.sh to set up {RENEW_TIMER}",
+            )
+        )
     return checks

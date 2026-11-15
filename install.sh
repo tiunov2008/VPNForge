@@ -86,6 +86,50 @@ exec docker run --rm -i \
 EOF
 chmod 0755 /usr/local/bin/vpnforge
 
+install_cert_renew_schedule() {
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+        cat > /etc/systemd/system/vpnforge-cert-renew.service <<'UNIT'
+[Unit]
+Description=Renew VPNForge Let's Encrypt certificate
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/usr/local/bin/vpnforge
+ConditionPathExists=/etc/vpnforge/vpnforge.env
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vpnforge cert renew
+UNIT
+        cat > /etc/systemd/system/vpnforge-cert-renew.timer <<'UNIT'
+[Unit]
+Description=Twice-daily VPNForge certificate renewal check
+
+[Timer]
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+        systemctl daemon-reload
+        systemctl enable --now vpnforge-cert-renew.timer
+        echo "Certificate auto-renewal: systemd timer vpnforge-cert-renew.timer"
+    elif [ -d /etc/cron.d ]; then
+        cat > /etc/cron.d/vpnforge-cert-renew <<'CRON'
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+17 3,15 * * * root [ -f /etc/vpnforge/vpnforge.env ] && /usr/local/bin/vpnforge cert renew >/var/log/vpnforge-cert-renew.log 2>&1
+CRON
+        chmod 0644 /etc/cron.d/vpnforge-cert-renew
+        echo "Certificate auto-renewal: cron job /etc/cron.d/vpnforge-cert-renew"
+    else
+        echo "WARNING: neither systemd nor cron found; schedule 'vpnforge cert renew' manually."
+    fi
+}
+
+install_cert_renew_schedule
+
 INSTALL_ARGS=(install --domain "$DOMAIN")
 if [ "$FORCE" = "true" ]; then
     INSTALL_ARGS+=(--force)
