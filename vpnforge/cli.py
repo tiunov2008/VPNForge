@@ -108,6 +108,14 @@ def cert_issue() -> None:
     execute(cert_command.issue)
 
 
+@cert_app.command("renew")
+def cert_renew(
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    force: bool = typer.Option(False, "--force"),
+) -> None:
+    execute(lambda: cert_command.renew(dry_run, force))
+
+
 @xray_app.command("render")
 def xray_render(force: bool = typer.Option(False, "--force")) -> None:
     execute(lambda: xray_command.render(force))

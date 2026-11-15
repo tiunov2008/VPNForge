@@ -22,6 +22,24 @@ To replace existing settings during install, pass `--force`:
 curl -fsSL https://raw.githubusercontent.com/tiunov2008/VPNForge/main/install.sh | sudo bash -s -- example.com --force
 ```
 
+## Certificate Renewal
+
+`install.sh` sets up the `vpnforge-cert-renew.timer` systemd timer (or `/etc/cron.d/vpnforge-cert-renew` on hosts without systemd). Twice a day it runs:
+
+```bash
+vpnforge cert renew
+```
+
+Certbot renews the certificate when it is within 30 days of expiry. When a new certificate appears, VPNForge copies it for Xray and Hysteria, reloads Nginx and restarts Xray and Hysteria. Servers installed before this timer existed get it by rerunning `install.sh` with the same domain.
+
+```bash
+systemctl list-timers vpnforge-cert-renew.timer
+journalctl -u vpnforge-cert-renew.service
+vpnforge cert renew --dry-run
+```
+
+`vpnforge doctor` reports the certificate expiry date and when the renewal last ran.
+
 ## Storage
 
 - Settings: `/etc/vpnforge/vpnforge.env`

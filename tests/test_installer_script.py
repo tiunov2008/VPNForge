@@ -17,3 +17,16 @@ def test_install_script_installs_container_wrapper():
     assert "VPNFORGE_HOST_BIN_DIR=/host/usr/local/bin" in content
     assert "git clone" not in content
     assert "python3 -m venv" not in content
+
+
+def test_install_script_schedules_certificate_renewal():
+    root = Path(__file__).resolve().parents[1]
+    content = (root / "install.sh").read_text(encoding="utf-8")
+
+    assert "/etc/systemd/system/vpnforge-cert-renew.timer" in content
+    assert "ExecStart=/usr/local/bin/vpnforge cert renew" in content
+    assert "systemctl enable --now vpnforge-cert-renew.timer" in content
+    assert "/etc/cron.d/vpnforge-cert-renew" in content
+    assert content.index("install_cert_renew_schedule\n") < content.index(
+        'exec /usr/local/bin/vpnforge "${INSTALL_ARGS[@]}"'
+    )
