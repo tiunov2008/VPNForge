@@ -1,0 +1,260 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "dns": {
+    "servers": [
+      "https+local://8.8.4.4/dns-query",
+      "https+local://1.1.1.1/dns-query",
+      "localhost"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "inbounds": [
+    {
+      "tag": "VLESS_TLS",
+      "port": 443,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none",
+        "fallbacks": [
+          {
+            "path": "/w4n8q1",
+            "dest": 3335,
+            "xver": 0
+          },
+          {
+            "dest": "/dev/shm/nginx.sock",
+            "xver": 2
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "raw",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/xray/cert/fullchain.pem",
+              "keyFile": "/var/lib/xray/cert/privkey.pem"
+            }
+          ],
+          "minVersion": "1.2",
+          "alpn": [
+            "h2",
+            "http/1.1"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "VLESS_XHTTP",
+      "port": 3333,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "none",
+        "xhttpSettings": {
+          "mode": "stream-up",
+          "path": "/290c7a8e"
+        },
+        "sockopt": {
+          "trustedXForwardedFor": [
+            "X-Real-IP"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "VLESS_GRPC",
+      "port": 3334,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "none",
+        "grpcSettings": {
+          "serviceName": "g7k2m9"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "VLESS_WS",
+      "port": 3335,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/w4n8q1"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "VLESS_REALITY_8443",
+      "port": 8443,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "raw",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "target": "127.0.0.1:9443",
+          "xver": 0,
+          "serverNames": [
+            "helix.pro-sys.su"
+          ],
+          "privateKey": "PASTE_PRIVATE_KEY_FROM_xray_x25519",
+          "shortIds": [
+            "PASTE_SHORT_ID_hex_8_to_16"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "SS_TCP",
+      "port": 2040,
+      "listen": "0.0.0.0",
+      "protocol": "shadowsocks",
+      "settings": {
+        "clients": [],
+        "network": "tcp,udp"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "DIRECT",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIPv4"
+      }
+    },
+    {
+      "tag": "BLOCK",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "DNS_OUT",
+      "protocol": "dns"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "port": "53",
+        "outboundTag": "DNS_OUT"
+      },
+      {
+        "network": "udp",
+        "port": "443",
+        "outboundTag": "BLOCK"
+      },
+      {
+        "ip": [
+          "::/0"
+        ],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "port": "25, 135, 137-139, 445",
+        "outboundTag": "BLOCK"
+      },
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "domain": [
+          "geosite:category-ads",
+          "geosite:private"
+        ],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "domain": [
+          "geosite:category-ip-geo-detect"
+        ],
+        "outboundTag": "BLOCK"
+      }
+    ]
+  }
+}
